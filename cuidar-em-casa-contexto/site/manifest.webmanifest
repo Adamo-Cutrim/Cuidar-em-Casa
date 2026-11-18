@@ -1,0 +1,20 @@
+{
+ "name": "Cuidar em Casa",
+ "short_name": "Cuidar",
+ "description": "Agenda, pacientes e faturamento de atendimentos domiciliares.",
+ "lang": "pt-BR",
+ "start_url": "/",
+ "scope": "/",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#F1F6F4",
+ "theme_color": "#1E7468",
+ "icons": [
+  {
+   "src": "/icon.svg",
+   "sizes": "any",
+   "type": "image/svg+xml",
+   "purpose": "any"
+  }
+ ]
+}
