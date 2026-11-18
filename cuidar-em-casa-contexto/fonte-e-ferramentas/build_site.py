@@ -1,6 +1,9 @@
 import re, os, sys, json
-SRC = '/tmp/claude-0/-home-claude/aa82f2d5-0af4-559e-8728-4499b420e757/scratchpad/cuidar-em-casa.html'
-OUT = '/tmp/claude-0/-home-claude/aa82f2d5-0af4-559e-8728-4499b420e757/scratchpad/site'
+# Gera a pasta site/ (versão independente, ligada ao Supabase) a partir do HTML da v14.
+# Uso: python3 fonte-e-ferramentas/build_site.py [ORIGEM.html] [PASTA_SAIDA]
+AQUI = os.path.dirname(os.path.abspath(__file__))
+SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(AQUI, 'cuidar-em-casa.html')
+OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(AQUI, '..', 'site')
 SB_URL = 'https://ynbqblvdtgwabczbssfp.supabase.co'
 SB_KEY = 'sb_publishable_Tuay0Raxi1UIqQLi1pNrcA_hqdThXOV'
 
@@ -20,6 +23,15 @@ def cut(t, a, b, new):
 def rep(t, a, b):
     once(t, a)
     return t.replace(a, b)
+
+# ---------- 0. ids: uuid v4 (o banco usa uuid como chave) ----------
+js = cut(js, "const uid=()=>{", "const BRL=", r'''const uid=()=>{
+  if(crypto.randomUUID) return crypto.randomUUID();
+  const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+  const x=Array.from(b,n=>n.toString(16).padStart(2,'0')).join('');
+  return x.slice(0,8)+'-'+x.slice(8,12)+'-'+x.slice(12,16)+'-'+x.slice(16,20)+'-'+x.slice(20);
+};
+''')
 
 # ---------- 1. constantes e estado ----------
 NEW_CONSTS = r'''const HIDE_KEY='cuidar-em-casa:ocultar-valores';
@@ -167,9 +179,31 @@ function readHashSession(){
   return {access_token:p.get('access_token'),refresh_token:p.get('refresh_token')||'',expires_in:p.get('expires_in'),expires_at:p.get('expires_at'),type:p.get('type')};
 }
 
-/* ---------- dados: carregar do banco e gravar só o que mudou ---------- */
-const KINDS=['companies','patients','visits'];
-let snap={companies:new Map(),patients:new Map(),visits:new Map(),perfil:''};
+/* ---------- dados: carregar do banco e gravar só o que mudou ----------
+   Esquema normalizado (backend/BACKEND.md §9): uma tabela por entidade, ids uuid e colunas próprias.
+   O estado S continua no formato da v14; este bloco traduz S para as linhas do banco e de volta.
+   Dados de exemplo (ex:true) nunca vão para o banco (ESTRUTURA_BASE §7, regra 9). */
+const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const isUuid=s=>typeof s==='string'&&UUID_RE.test(s);
+/* Id que não é uuid (ex.: ocorrência recorrente que virou registro, "r-{paciente}-{data}") ganha um uuid fixo,
+   calculado do id e do usuário: é sempre a mesma linha no banco e não colide com a de outro usuário. */
+function hashUuid(s){
+  const h=[0x811c9dc5,0x01000193,0x9e3779b9,0x85ebca6b];
+  for(let i=0;i<s.length;i++){
+    const c=s.charCodeAt(i);
+    for(let k=0;k<4;k++) h[k]=Math.imul(h[k]^c,0x01000193+0x2000*k)>>>0;
+  }
+  for(let k=0;k<4;k++){let x=h[k]^h[(k+1)%4];x=Math.imul(x^(x>>>16),0x85ebca6b);x=Math.imul(x^(x>>>13),0xc2b2ae35);h[k]=(x^(x>>>16))>>>0;}
+  const x=h.map(n=>n.toString(16).padStart(8,'0')).join('');
+  return x.slice(0,8)+'-'+x.slice(8,12)+'-5'+x.slice(13,16)+'-'+(8|(parseInt(x.charAt(16),16)&3)).toString(16)+x.slice(17,20)+'-'+x.slice(20,32);
+}
+const dbId=id=>isUuid(id)?id:hashUuid(ses.user.id+'|'+id);
+const tipoKey=n=>String(n).trim().toLowerCase();
+const dbTime=h=>typeof h==='string'?h.slice(0,5):'';
+const T_ORDER=['companies','patients','visits','recurrences','recurrence_exceptions','service_types'];
+const T_CONFLICT={companies:'id',patients:'id',visits:'id',recurrences:'patient_id',recurrence_exceptions:'patient_id,data',service_types:'id'};
+const emptySnap=()=>({companies:new Map(),patients:new Map(),visits:new Map(),recurrences:new Map(),recurrence_exceptions:new Map(),service_types:new Map(),perfil:''});
+let snap=emptySnap(), tipoIds=new Map();
 async function fetchAll(table,cols,order){
   let out=[],from=0;const page=1000;
   for(;;){
@@ -181,44 +215,124 @@ async function fetchAll(table,cols,order){
   }
   return out;
 }
-function rowOf(kind,x){
-  const d=Object.assign({},x),id=d.id;
-  delete d.id;
-  if(kind==='visits'){const date=d.date,status=d.status;delete d.date;delete d.status;return {id:id,date:date,status:status,data:d};}
-  return {id:id,data:d};
-}
 function profRow(){
   const p=S.perfil||{};
-  return {nome:p.nome||'',tel:p.tel||'',profissao:p.profissao||'',registro:p.registro||'',cidade:p.cidade||'',tipos:Array.isArray(S.tipos)?S.tipos:null,iniciado:true};
+  return {nome:p.nome||'',tel:p.tel||'',profissao:p.profissao||'',registro:p.registro||'',cidade:p.cidade||'',iniciado:true};
+}
+/* O que o banco deveria ter agora, tabela por tabela: Map(chave -> linha). Toda linha de uma tabela tem as mesmas colunas. */
+function desiredRows(){
+  const uid=ses.user.id,D={};
+  T_ORDER.forEach(function(t){D[t]=new Map();});
+  const comps=new Set();
+  S.companies.forEach(function(c){
+    if(c.ex) return;
+    const id=dbId(c.id);comps.add(c.id);
+    D.companies.set(id,{id:id,user_id:uid,nome:c.nome,tipo:c.tipo||'',contato:c.contato||'',valor_padrao:c.valorPadrao==null?null:c.valorPadrao,pagamento:c.pagamento||'',obs:c.obs||'',cor:c.cor||0});
+  });
+  const pats=new Set();
+  S.patients.forEach(function(p){
+    if(p.ex) return;
+    const id=dbId(p.id);pats.add(p.id);
+    D.patients.set(id,{id:id,user_id:uid,company_id:p.empresaId&&comps.has(p.empresaId)?dbId(p.empresaId):null,nome:p.nome,nasc:p.nasc||null,tel:p.tel||'',
+      resp_nome:p.respNome||'',resp_tel:p.respTel||'',endereco:p.endereco||'',bairro:p.bairro||'',ref:p.ref||'',valor:p.valor==null?null:p.valor,
+      condicoes:p.condicoes||'',alergias:p.alergias||'',medicamentos:p.medicamentos||'',obs:p.obs||''});
+    const r=p.rec;
+    if(r) D.recurrences.set(id,{patient_id:id,user_id:uid,ativo:!!r.ativo,dias:r.dias.slice(),hora:r.hora,tipo:r.tipo||'',inicio:r.inicio,fim:r.fim||null});
+    (p.recExc||[]).forEach(function(d){D.recurrence_exceptions.set(id+'|'+d,{patient_id:id,user_id:uid,data:d});});
+  });
+  S.visits.forEach(function(v){
+    if(v.ex||v.virtual||!pats.has(v.pacienteId)) return;
+    const id=dbId(v.id);
+    D.visits.set(id,{id:id,user_id:uid,patient_id:dbId(v.pacienteId),data:v.date,hora:v.hora,tipo:v.tipo||'',obs:v.obs||'',status:v.status,
+      serie_data:v.serie===v.pacienteId&&v.serieData?v.serieData:null,manual:!!v.manual});
+  });
+  if(Array.isArray(S.tipos)) S.tipos.forEach(function(n){
+    const k=tipoKey(n);
+    if(!k||D.service_types.has(tipoIds.get(k)||hashUuid(uid+'|tipo|'+k))) return;
+    const id=tipoIds.get(k)||hashUuid(uid+'|tipo|'+k);
+    D.service_types.set(id,{id:id,user_id:uid,nome:String(n).trim()});
+  });
+  return D;
+}
+function takeSnap(){
+  const D=desiredRows();snap=emptySnap();
+  T_ORDER.forEach(function(t){D[t].forEach(function(row,k){snap[t].set(k,JSON.stringify(row));});});
+  snap.perfil=JSON.stringify(profRow());
 }
 async function loadAll(){
   const r=await Promise.all([
-    api('/rest/v1/profiles?select=*&limit=1'),
-    fetchAll('companies','id,data','id'),
-    fetchAll('patients','id,data','id'),
-    fetchAll('visits','id,date,status,data','date,id')
+    api('/rest/v1/profiles?select=nome,tel,profissao,registro,cidade,iniciado&limit=1'),
+    fetchAll('companies','id,nome,tipo,contato,valor_padrao,pagamento,obs,cor','id'),
+    fetchAll('patients','id,company_id,nome,nasc,tel,resp_nome,resp_tel,endereco,bairro,ref,valor,condicoes,alergias,medicamentos,obs','id'),
+    fetchAll('visits','id,patient_id,data,hora,tipo,obs,status,serie_data,manual','data,id'),
+    fetchAll('recurrences','patient_id,ativo,dias,hora,tipo,inicio,fim','patient_id'),
+    fetchAll('recurrence_exceptions','patient_id,data','patient_id,data'),
+    fetchAll('service_types','id,nome','created_at,id')
   ]);
   const p=(Array.isArray(r[0])&&r[0][0])||null;
+  const recs=new Map(),excs=new Map();
+  r[4].forEach(function(x){recs.set(x.patient_id,{ativo:x.ativo,dias:x.dias,hora:dbTime(x.hora),tipo:x.tipo,inicio:x.inicio,fim:x.fim||''});});
+  r[5].forEach(function(x){if(!excs.has(x.patient_id)) excs.set(x.patient_id,[]);excs.get(x.patient_id).push(x.data);});
+  tipoIds=new Map();r[6].forEach(function(x){tipoIds.set(tipoKey(x.nome),x.id);});
   const raw={
-    companies:r[1].map(x=>Object.assign({},x.data,{id:x.id})),
-    patients:r[2].map(x=>Object.assign({},x.data,{id:x.id})),
-    visits:r[3].map(x=>Object.assign({},x.data,{id:x.id,date:x.date,status:x.status})),
+    companies:r[1].map(x=>({id:x.id,nome:x.nome,tipo:x.tipo,contato:x.contato,valorPadrao:x.valor_padrao,pagamento:x.pagamento,obs:x.obs,cor:x.cor})),
+    patients:r[2].map(function(x){
+      const o={id:x.id,nome:x.nome,nasc:x.nasc||'',tel:x.tel,respNome:x.resp_nome,respTel:x.resp_tel,endereco:x.endereco,bairro:x.bairro,ref:x.ref,
+        empresaId:x.company_id||'',valor:x.valor,condicoes:x.condicoes,alergias:x.alergias,medicamentos:x.medicamentos,obs:x.obs};
+      if(recs.has(x.id)) o.rec=recs.get(x.id);
+      if(excs.has(x.id)) o.recExc=excs.get(x.id);
+      return o;
+    }),
+    visits:r[3].map(function(x){
+      const o={id:x.id,pacienteId:x.patient_id,date:x.data,hora:dbTime(x.hora),tipo:x.tipo,obs:x.obs,status:x.status};
+      if(x.serie_data){o.serie=x.patient_id;o.serieData=x.serie_data;}
+      if(x.manual) o.manual=true;
+      return o;
+    }),
     rev:0,
     perfil:p?{nome:p.nome,tel:p.tel,profissao:p.profissao,registro:p.registro,cidade:p.cidade}:{},
-    tipos:(p&&Array.isArray(p.tipos))?p.tipos:undefined
+    tipos:r[6].length?r[6].map(x=>x.nome):undefined
   };
   const semDados=!raw.companies.length&&!raw.patients.length&&!raw.visits.length;
-  snap={companies:new Map(),patients:new Map(),visits:new Map(),perfil:''};
+  snap=emptySnap();
   if(semDados&&!(p&&p.iniciado)){
     S=makeDemo();S.perfil={nome:'',tel:'',profissao:'',registro:'',cidade:''};
   }else{
     S=normalize(raw);
-    KINDS.forEach(function(k){S[k].forEach(function(x){snap[k].set(x.id,JSON.stringify(rowOf(k,x)));});});
-    snap.perfil=JSON.stringify(profRow());
+    takeSnap();
   }
   if(!S.perfil.nome) S.perfil.nome=cleanName(ses.user.nome)||ses.user.email.split('@')[0];
   auth.conta={nome:S.perfil.nome,email:ses.user.email};
   lastLoad=Date.now();
+}
+const inList=a=>'in.('+a.map(encodeURIComponent).join(',')+')';
+async function sendDeletes(t,keys){
+  if(!keys.length) return;
+  if(t==='recurrence_exceptions'){
+    const byP=new Map();
+    keys.forEach(function(k){const i=k.indexOf('|'),pid=k.slice(0,i);if(!byP.has(pid)) byP.set(pid,[]);byP.get(pid).push(k);});
+    for(const [pid,ks] of byP){
+      for(let i=0;i<ks.length;i+=100){
+        const part=ks.slice(i,i+100);
+        await api('/rest/v1/'+t+'?patient_id=eq.'+pid+'&data='+inList(part.map(k=>k.slice(k.indexOf('|')+1))),{method:'DELETE',prefer:'return=minimal'});
+        part.forEach(function(k){snap[t].delete(k);});
+      }
+    }
+    return;
+  }
+  const col=t==='recurrences'?'patient_id':'id';
+  for(let i=0;i<keys.length;i+=100){
+    const part=keys.slice(i,i+100);
+    await api('/rest/v1/'+t+'?'+col+'='+inList(part),{method:'DELETE',prefer:'return=minimal'});
+    part.forEach(function(k){snap[t].delete(k);});
+  }
+}
+async function sendUpserts(t,list){
+  for(let i=0;i<list.length;i+=200){
+    const part=list.slice(i,i+200);
+    await api('/rest/v1/'+t+'?on_conflict='+T_CONFLICT[t],{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:part.map(x=>x.row)});
+    part.forEach(function(x){snap[t].set(x.k,x.json);});
+  }
 }
 async function pushAll(){
   const uid=ses.user.id;
@@ -227,25 +341,18 @@ async function pushAll(){
     await api('/rest/v1/profiles?on_conflict=user_id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:Object.assign({user_id:uid},profRow())});
     snap.perfil=pj;
   }
-  for(let n=0;n<KINDS.length;n++){
-    const kind=KINDS[n],cur=new Map(),up=[],keys=new Map(),del=[];
-    S[kind].forEach(function(x){cur.set(x.id,rowOf(kind,x));});
-    cur.forEach(function(row,id){
-      const k=JSON.stringify(row);
-      if(snap[kind].get(id)!==k){up.push(Object.assign({user_id:uid},row));keys.set(id,k);}
-    });
-    snap[kind].forEach(function(k,id){if(!cur.has(id)) del.push(id);});
-    for(let i=0;i<up.length;i+=200){
-      const part=up.slice(i,i+200);
-      await api('/rest/v1/'+kind+'?on_conflict=user_id,id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:part});
-      part.forEach(function(r){snap[kind].set(r.id,keys.get(r.id));});
-    }
-    for(let i=0;i<del.length;i+=100){
-      const part=del.slice(i,i+100);
-      await api('/rest/v1/'+kind+'?id=in.('+part.join(',')+')',{method:'DELETE',prefer:'return=minimal'});
-      part.forEach(function(id){snap[kind].delete(id);});
-    }
-  }
+  const D=desiredRows(),up={},del={};
+  T_ORDER.forEach(function(t){
+    up[t]=[];del[t]=[];
+    D[t].forEach(function(row,k){const j=JSON.stringify(row);if(snap[t].get(k)!==j) up[t].push({k:k,row:row,json:j});});
+    snap[t].forEach(function(j,k){if(!D[t].has(k)) del[t].push(k);});
+  });
+  /* Ordem pensada para as chaves estrangeiras e unicidades: primeiro some o que saiu dos filhos,
+     depois grava pais antes de filhos, e por fim apaga pacientes e empresas (o banco cuida das cascatas). */
+  for(const t of ['recurrence_exceptions','recurrences','visits','service_types']) await sendDeletes(t,del[t]);
+  for(const t of T_ORDER) await sendUpserts(t,up[t]);
+  await sendDeletes('patients',del.patients);
+  await sendDeletes('companies',del.companies);
 }
 function commit(){
   S.persisted=true;S.rev=(S.rev||0)+1;
@@ -409,7 +516,7 @@ async function sair(msg,semGravar){
   if(ses){try{await api('/auth/v1/logout?scope=local',{method:'POST'});}catch(e){}}
   clearSes();
   auth.logged=false;auth.mode='';auth.conta=null;auth.msg=typeof msg==='string'?msg:'';
-  S=makeDemo();snap={companies:new Map(),patients:new Map(),visits:new Map(),perfil:''};
+  S=makeDemo();snap=emptySnap();
   ui.tab='agenda';ui.q='';ui.fcomp='all';
   ['#top','#view','#tabs','#fab'].forEach(function(s){const e=$(s);if(e) e.innerHTML='';});
   showGate('entrar');
@@ -553,6 +660,7 @@ vercel = {"cleanUrls": True, "headers": [{"source": "/(.*)", "headers": [
 os.makedirs(OUT, exist_ok=True)
 w = lambda n, t: open(os.path.join(OUT, n), 'w', encoding='utf-8').write(t)
 w('index.html', index); w('app.js', '(function(){\n' + js.strip().rstrip() + '\n') if False else None
+js = js.replace('[\u0300-\u036f]', '[\\u0300-\\u036f]').replace("'\ufeff'", "'\\ufeff'")
 open(os.path.join(OUT, 'app.js'), 'w', encoding='utf-8').write(js)
 w('styles.css', css); w('manifest.webmanifest', json.dumps(manifest, ensure_ascii=False, indent=1)); w('icon.svg', icon)
 w('vercel.json', json.dumps(vercel, indent=1))

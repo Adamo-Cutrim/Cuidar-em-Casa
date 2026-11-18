@@ -379,7 +379,9 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 12. **Plano do projeto de testes** (Free ou Pro) e quem aplicou as migrações de 17/11, para registrar aqui.
 13. **Configurações do Auth no painel** (confirmação de e-mail, política de senha, proteção contra senhas vazadas, Google): não visíveis pelas ferramentas; conferir e registrar.
 14. **Tabela `settings`** (ocultar valores sincronizado entre aparelhos) e **tabela de auditoria de acessos**: criar agora ou só na fase H?
-15. **Finalidade de `profiles.iniciado`:** confirmar antes de ligar o app, para saber se mantém.
+15. ~~Finalidade de `profiles.iniciado`~~ **Esclarecido em 18/11/2026:** marca que a conta já passou da primeira abertura. Com ela `true` e sem dados, o app não volta a mostrar os dados de exemplo. Mantida.
+16. **Tipos de exemplo:** se a pessoa grava algo sem apagar os exemplos, a lista de tipos da demonstração (ex.: "Curativo pós-cirúrgico") vai para `service_types`. São só nomes, sem dado de paciente; decidir se a v16 deve filtrá-los.
+17. **Lista de tipos vazia:** sem linhas em `service_types` o app mostra os tipos padrão. Quem apagar todos os tipos verá os padrões de novo ao recarregar.
 
 ---
 
@@ -392,12 +394,22 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 
 ---
 
+## 9.7 Camada de dados do site (v15)
+
+- **[Fato]** `site/app.js` (gerado por `fonte-e-ferramentas/build_site.py`) fala com o Supabase só com `fetch` (Auth + PostgREST), sem biblioteca de terceiros.
+- O estado `S` continua no formato da v14 (seção 4). `desiredRows()` traduz `S` para as linhas de cada tabela pelo mapa da seção 9.6; `loadAll()` faz o caminho de volta.
+- Gravação incremental: compara com a última foto (`snap`) e envia só o que mudou. Ordem: apaga filhos (exceções, recorrências, atendimentos, tipos), grava pais antes de filhos (empresas, pacientes, atendimentos, recorrências, exceções, tipos) e por fim apaga pacientes e empresas. Upsert com `on_conflict` na chave de cada tabela.
+- Ids: `uid()` gera uuid v4. Id que não é uuid (a ocorrência recorrente que vira registro, `r-{paciente}-{data}`) recebe um uuid fixo calculado do id e do usuário (`hashUuid`).
+- Dados de exemplo (`ex: true`) não vão para o banco; paciente real ligado a empresa de exemplo grava `company_id = null`.
+- Verificado em 18/11/2026: 57 verificações de navegador contra o mock `testes/harness.py` (que reproduz colunas, uuid, constraints, FKs compostas, cascatas e RLS) e as mesmas gravações em SQL no banco real, como usuário autenticado, numa transação desfeita (0 linhas e 0 usuários depois).
+
 ## 13. Histórico deste documento
 
 | Data | Mudança |
 |---|---|
 | 18/11/2026 | Criação a partir de `PLANO_SUPABASE.md`, `AUDITORIA_2026-11-16.md`, `INDICE.md` e do código da v14. Sessão dedicada à frente de back-end. |
 | 18/11/2026 | Descoberto o projeto Supabase de testes já existente, com esquema jsonb por linha (RLS, vazio) e a tabela `site_stage` com leitura pública. Verificado e testado o isolamento entre 2 usuários (desfeito). |
+| 18/11/2026 16:13 | (Claude Code) v15: camada de dados do site adaptada ao esquema normalizado (seção 9.7). Mock e testes reescritos para o esquema real. SQL das migrações de 17/11 exportado para `backend/sql/2026-11-17/`. Ponto 15 esclarecido; pontos 16 e 17 novos. |
 | 18/11/2026 | Por decisão do usuário: (1) leitura pública de `site_stage` fechada; (2) migração para o **esquema normalizado** (companies, patients, visits, recurrences, recurrence_exceptions, service_types; FKs compostas com `user_id`, cascatas, constraints, índices, RLS), com trava contra perda de dados. Testes de isolamento, FKs, cascatas e constraints passaram (desfeitos). Índice adicional em `recurrences` após advisor. SQL salvo em `backend/sql/2026-11-18_migracoes_aplicadas.sql`. Seção 9 reescrita; seção 10 atualizada; pontos em aberto 10 a 15. |
 
 ---
