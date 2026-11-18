@@ -16,7 +16,7 @@
 - **[Decisão do usuário]** Quer hospedar o app no **Supabase** e fechar os pontos da auditoria. O plano de execução está em `deploy/PLANO_SUPABASE.md`.
 - **[Fato, aplicado em 18/11/2026]** Existe um projeto Supabase de testes (`cuidar-em-casa-teste`, São Paulo) com o **esquema normalizado** da fase B aplicado (tabelas tipadas, chaves estrangeiras compostas, RLS, constraints, índices), **vazio** (0 usuários, 0 linhas). Testado: isolamento entre usuários, cascatas e constraints. Detalhes na **seção 9**; SQL em `backend/sql/2026-11-18_migracoes_aplicadas.sql`. Havia um esquema anterior (jsonb por linha, de 17/11), substituído por decisão do usuário.
 - **[Fato]** Continuam sem registro: repositório, host estático escolhido, login Google, a v15 (Exportar/Importar backup + fontes locais, que não consta em `versoes/INDICE.md`; a última versão salva é a 14) e qualquer ligação do app ao Supabase (o app ainda usa `window.claude.use('db')`).
-- **Ferramentas desta sessão:** conectores Supabase e Vercel disponíveis. O Supabase foi usado (migrações e testes, seção 9). O Vercel não foi usado.
+- **Ferramentas desta sessão:** conectores Supabase e Vercel disponíveis. O Supabase foi usado (migrações e testes, seção 9). O Vercel foi usado em 18/11/2026 para publicar o site (seção 12).
 
 ### Documentos do projeto relacionados
 
@@ -289,6 +289,7 @@ Ordem sugerida: v15 (backup + fontes locais) → organizar em arquivos + reposit
 | 20261118172655 | `fecha_leitura_publica_site_stage` | Removeu política e permissões de `anon`/`authenticated` da `site_stage` |
 | 20261118172825 | `esquema_normalizado` | Esquema normalizado desta seção (com trava que aborta se as tabelas antigas tivessem dados) |
 | 20261118172908 | `indice_recurrences_user_patient` | Índice apontado pelo advisor de performance |
+| 20261118195029 | `remove_site_stage` | Apagou a tabela `site_stage` depois do deploy na Vercel (decisão do usuário). SQL em `backend/sql/2026-11-18_remove_site_stage.sql`. |
 
 O SQL das migrações de 18/11 está guardado em `backend/sql/2026-11-18_migracoes_aplicadas.sql` (registro; não rodar de novo no mesmo banco).
 
@@ -307,7 +308,6 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 | `recurrences` | `patient_id` (PK), `ativo`, `dias smallint[]`, `hora`, `tipo`, `inicio`, `fim`, timestamps | uma regra por paciente; `dias` só de 0 a 6; se `ativo`, precisa de pelo menos 1 dia; `fim >= inicio` |
 | `recurrence_exceptions` | PK `(patient_id, data)`, `created_at` | ocorrências excluídas de uma recorrência |
 | `service_types` | `id`, `nome`, `created_at` | `nome` 1 a 60; único por usuário sem diferenciar maiúsculas/espaços nas pontas |
-| `site_stage` | PK `(name, part)`, `body` | Tabela temporária com `app.js` em 2 partes. Ver 9.5. |
 
 ### 9.3 Relações, cascatas, índices, segurança
 
@@ -330,7 +330,7 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 
 ### 9.5 Lacunas e pontos do esquema a ter em mente
 
-- `site_stage`: **leitura pública fechada** em 18/11 (decisão do usuário). O conteúdo (2 linhas) foi preservado. Se alguma versão do site ou fluxo de publicação lia essa tabela pela chave pública, **vai deixar de funcionar**; finalidade não confirmada.
+- `site_stage`: **apagada em 18/11/2026** depois do deploy. Antes, a leitura pública tinha sido fechada (18/11) e o conteúdo (2 pedaços incompletos do `app.js` antigo) ficou só no histórico do projeto; nada lia a tabela.
 - **Não impedido pelo banco:** dias repetidos em `recurrences.dias` (ex.: `{1,1}`); mais de 200 tipos por usuário; limite de 5.000 exceções por paciente; texto vazio de `visits.tipo` ou outros textos.
 - **Não criados (decisões em aberto, seção 11):** `valor_snapshot` em `visits` (item 1), FK de `visits.tipo` para `service_types` (item 3), tabela `settings` (preferência de ocultar valores continua só no aparelho) e tabela de auditoria de acessos (fase H).
 - `profiles.iniciado`: coluna herdada do esquema de 17/11, finalidade não confirmada; mantida.
@@ -371,11 +371,11 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 4. **Quem é o controlador dos dados** (profissional ou empresa/clínica) e se algum dia haverá compartilhamento de pacientes entre profissionais. Hoje o modelo é um usuário = seus próprios dados (`user_id`).
 5. **Proteção extra para campos de saúde** (`condicoes`, `alergias`, `medicamentos`, `obs`): suficiente com RLS + criptografia em repouso do provedor, ou exigir cifra por campo? Validar com profissional de proteção de dados.
 6. **Offline:** necessário na primeira versão? O plano o marca como opcional e posterior (fila local cifrada).
-7. **Host estático e domínio:** ainda não escolhidos.
+7. ~~Host estático~~ **Decidido em 18/11/2026: Vercel**, projeto `cuidar-em-casa`, URL https://cuidar-em-casa-three.vercel.app. Domínio próprio ainda não escolhido.
 8. **Plano Free × Pro:** confirmar valores e limites atuais na página do Supabase no momento da contratação.
 9. **Exclusão de conta:** apagar de imediato ou manter por período para recuperação? Definir junto com a política de privacidade.
 10. ~~Esquema: jsonb por linha ou normalizado?~~ **Decidido em 18/11/2026: normalizado** (aplicado, seção 9).
-11. **`site_stage`:** a leitura pública foi fechada em 18/11 (decisão do usuário). Falta confirmar para que servia, se algo dependia dela e quando apagar a tabela de vez.
+11. ~~`site_stage`~~ **Resolvido em 18/11/2026:** servia a uma tentativa antiga de publicar o site pelo banco; nada dependia dela; apagada depois do deploy.
 12. **Plano do projeto de testes** (Free ou Pro) e quem aplicou as migrações de 17/11, para registrar aqui.
 13. **Configurações do Auth no painel** (confirmação de e-mail, política de senha, proteção contra senhas vazadas, Google): não visíveis pelas ferramentas; conferir e registrar.
 14. **Tabela `settings`** (ocultar valores sincronizado entre aparelhos) e **tabela de auditoria de acessos**: criar agora ou só na fase H?
@@ -389,7 +389,8 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 
 - O conector Supabase desta sessão funciona (leitura de esquema, SQL e advisors) e foi usado em 18/11/2026. Criar contas (Google Cloud, host, domínio), pagar planos e criar o projeto de produção continuam dependendo do usuário; criar projeto Supabase exige confirmar a organização e o custo antes.
 - A auditoria v14 usou um banco simulado: gravação real pelo app, dois aparelhos ao mesmo tempo, toque/rolagem em celular real e produção fora do Claude **não foram verificados**.
-- O app **ainda não foi ligado** ao Supabase: o esquema está pronto e testado só por SQL. Gravar e ler pelo app, o login real e dois aparelhos ao mesmo tempo continuam sem teste.
+- **Atualizado em 18/11/2026:** o site (v15) está ligado ao Supabase e publicado na Vercel (https://cuidar-em-casa-three.vercel.app). Login real, gravação e leitura pelo app foram testados pelo usuário no celular. Dois aparelhos ao mesmo tempo continuam sem teste.
+- A proteção contra senhas vazadas do Supabase Auth está desligada (aviso dos advisors); ligar no painel, se o plano permitir.
 - Configurações do Auth do projeto (e-mail, Google, política de senha) não são visíveis pelas ferramentas desta sessão: conferir no painel.
 
 ---
@@ -409,6 +410,7 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 |---|---|
 | 18/11/2026 | Criação a partir de `PLANO_SUPABASE.md`, `AUDITORIA_2026-11-16.md`, `INDICE.md` e do código da v14. Sessão dedicada à frente de back-end. |
 | 18/11/2026 | Descoberto o projeto Supabase de testes já existente, com esquema jsonb por linha (RLS, vazio) e a tabela `site_stage` com leitura pública. Verificado e testado o isolamento entre 2 usuários (desfeito). |
+| 18/11/2026 16:51 | (Claude Code) Site publicado na Vercel (projeto `cuidar-em-casa`, ligado ao GitHub, deploy automático da `main`). Usuário configurou as URLs do Auth e testou no celular sem erros. Tabela `site_stage` apagada (migração `remove_site_stage`). Pontos 7 e 11 resolvidos. |
 | 18/11/2026 16:13 | (Claude Code) v15: camada de dados do site adaptada ao esquema normalizado (seção 9.7). Mock e testes reescritos para o esquema real. SQL das migrações de 17/11 exportado para `backend/sql/2026-11-17/`. Ponto 15 esclarecido; pontos 16 e 17 novos. |
 | 18/11/2026 | Por decisão do usuário: (1) leitura pública de `site_stage` fechada; (2) migração para o **esquema normalizado** (companies, patients, visits, recurrences, recurrence_exceptions, service_types; FKs compostas com `user_id`, cascatas, constraints, índices, RLS), com trava contra perda de dados. Testes de isolamento, FKs, cascatas e constraints passaram (desfeitos). Índice adicional em `recurrences` após advisor. SQL salvo em `backend/sql/2026-11-18_migracoes_aplicadas.sql`. Seção 9 reescrita; seção 10 atualizada; pontos em aberto 10 a 15. |
 

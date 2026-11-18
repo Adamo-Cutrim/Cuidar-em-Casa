@@ -30,6 +30,7 @@
 - **[Fato]** Login é trava local (PBKDF2 no navegador), não é segurança real.
 - **[Fato]** Supabase de testes com esquema normalizado, RLS e testes de isolamento, **vazio e ainda não ligado ao app**.
 - **[Fato]** Sem repositório, sem testes automatizados, sem host escolhido.
+- **[Atualização 18/11/2026]** Os itens acima descrevem a v14. Desde então: repositório `Adamo-Cutrim/cuidar-em-casa` no GitHub; v15 (site independente) ligada ao Supabase Auth e ao esquema normalizado; testes de navegador em `fonte-e-ferramentas/testes/`; publicado na **Vercel** em https://cuidar-em-casa-three.vercel.app com deploy automático a cada merge na `main`.
 - **Fase do plano:** B concluída no banco de testes; **A (v15 + organização do código) ainda pendente**, e ela é pré-requisito para C e D.
 
 ---
@@ -227,7 +228,7 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 ## 9. Riscos e limitações conhecidos
 
 - A auditoria v14 usou banco simulado: gravação real, dois aparelhos e celular real **não foram testados**.
-- O app ainda não fala com o Supabase; o esquema só foi testado por SQL.
+- ~~O app ainda não fala com o Supabase~~ (resolvido na v15, publicada e testada pelo usuário no celular em 18/11/2026). Dois aparelhos ao mesmo tempo continuam sem teste.
 - Os problemas E1 a E5 vêm de leitura do código; E1 precisa ser conferido visualmente.
 - Sem repositório, não há histórico de diff: a única cópia de segurança do código são as versões em `versoes/`.
 - LGPD: dados de saúde são sensíveis; validar com profissional de proteção de dados antes de publicar (não sou advogado).
@@ -238,5 +239,6 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 
 | Data | Mudança |
 |---|---|
+| 18/11/2026 16:51 | (Claude Code) Host escolhido: Vercel, ligada ao GitHub (deploy automático da `main`). Site no ar e testado pelo usuário no celular. Seção 2 atualizada. |
 | 18/11/2026 16:13 | (Claude Code) v15 salva como pasta `versoes/v15_2026-11-18_1613_site/`: site independente com Supabase Auth e dados no esquema normalizado. A numeração do roteiro (seção 5) passa a contar a partir da v16. Testes em `fonte-e-ferramentas/testes/` (rodar com `rodar_testes.sh`). |
 | 18/11/2026 14:38 | Criação a partir de `BACKEND.md`, `PLANO_SUPABASE.md`, `AUDITORIA_2026-11-16.md`, `INDICE.md`, SQL de 18/11 e código da v14. Mapa do código, problemas E1–E5, estrutura alvo, roteiro v15–v20, regras de trabalho e skills recomendadas. |
