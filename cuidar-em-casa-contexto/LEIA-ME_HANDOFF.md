@@ -26,7 +26,7 @@ Gerado em 18/11/2026. Esta pasta reúne tudo o que existe do projeto "APP para H
 |---|---|
 | `planejamento/`, `backend/`, `deploy/`, `seguranca/`, `versoes/` | Documentos do Project, iguais aos do claude.ai (v12 a v14 inclusas). |
 | `site/` | **Versão independente do app, pronta para hospedagem** (sem `window.claude`): `index.html`, `app.js`, `styles.css`, `manifest.webmanifest`, `icon.svg`, `vercel.json` (CSP e cabeçalhos de segurança). Fala direto com o Supabase por login real e sincronização por linha. |
-| `fonte-e-ferramentas/` | `cuidar-em-casa.html` (v14 original), `build_site.py` (gera `site/` a partir do v14), `testes/` (mock do Supabase `harness.py` e testes de navegador `t1.py`, `t2.py`, 37 verificações), `stage-chunks/` (pedaços usados na tentativa de publicar via banco). |
+| `fonte-e-ferramentas/` | `cuidar-em-casa.html` (v14 original), `build_site.py` (gera `site/` a partir do v14), `testes/` (mock do Supabase `harness.py` e testes de navegador `t1.py`, `t2.py`, 37 verificações), `stage-chunks/` (pedaços usados na tentativa de publicar via banco; não veio para o repositório). |
 
 ## Supabase (projeto de testes)
 - Nome `cuidar-em-casa-teste`, ref `ynbqblvdtgwabczbssfp`, região `sa-east-1`, URL `https://ynbqblvdtgwabczbssfp.supabase.co`.
@@ -37,12 +37,12 @@ Gerado em 18/11/2026. Esta pasta reúne tudo o que existe do projeto "APP para H
 - Plano Free: sem backup automático e pausa após 1 semana sem uso. Dados reais de pacientes só no plano Pro.
 
 ## Estado do deploy (pedido principal do usuário: testar no celular)
-**Não concluído.** O site em `site/` foi construído e testado contra um Supabase simulado (37 de 37 verificações). Falta:
+**Não concluído.** Em 18/11/2026 (Claude Code) o `site/` foi adaptado ao esquema normalizado do banco (v15): a versão anterior gravava no esquema antigo em jsonb e falharia contra o banco atual. Agora passa em 57 de 57 verificações contra um mock que reproduz o esquema real, e as gravações foram conferidas em SQL no banco real (transação desfeita). Falta:
 1. Publicar `site/` na Vercel (conta pessoal, team `team_5JcllrpkR3M3EK72I0E7TOLf`). O ambiente do Claude.ai não alcança vercel.com nem GitHub. **Caminho mais simples no Claude Code:** na pasta `site/`, rodar `vercel --prod` (ou ligar um repositório GitHub). Projeto sem framework, sem build, pasta de saída = a própria pasta.
 2. Garantir que a URL de produção seja pública (desligar Vercel Authentication/SSO protection do projeto, se estiver ligada).
 3. No painel do Supabase (Authentication, URL Configuration): colocar a URL da Vercel em **Site URL** e em **Redirect URLs**; decidir sobre "Confirm email"; ligar proteção contra senhas vazadas. O SMTP embutido só envia para e-mails de membros da organização.
 4. Testar no celular: criar conta, cadastrar paciente, agendar, recarregar, sair e entrar.
-5. Rodar de novo `fonte-e-ferramentas/testes/t2.py` contra a versão final de `site/` (usa o mock; aponta `SB_URL` para `http://127.0.0.1:8766`).
+5. Rodar de novo `fonte-e-ferramentas/testes/rodar_testes.sh` contra a versão final de `site/` (sobe o mock e troca o `SB_URL` sozinho).
 6. Apagar `site_stage`; salvar `versoes/v15_...` e atualizar `INDICE.md` e o histórico de `ESTRUTURA_BASE.md`.
 
 ## Pendências conhecidas
@@ -52,5 +52,5 @@ Gerado em 18/11/2026. Esta pasta reúne tudo o que existe do projeto "APP para H
 - LGPD: dados de saúde são sensíveis; validar com profissional de proteção de dados antes de usar dados reais.
 
 ## Integridade
-`site/app.js` sha256 `2e3df0bcc26f0458f100d114ead284ee94b4d2673057c995e1085e26a8fdb8a4`
+`site/app.js` sha256 `26fde9a34c0214a71f05684cd0e68c549de7f6c278f5f6babc9e3f7c4fd8598f` (v15)
 `site/styles.css` sha256 `08d3f05f48ae96cd4b4e650686448430969f9f19be7ffcbd2a0e6c557838ebdf`

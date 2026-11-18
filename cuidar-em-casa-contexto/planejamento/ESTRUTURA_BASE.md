@@ -238,4 +238,5 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 
 | Data | Mudança |
 |---|---|
+| 18/11/2026 16:13 | (Claude Code) v15 salva como pasta `versoes/v15_2026-11-18_1613_site/`: site independente com Supabase Auth e dados no esquema normalizado. A numeração do roteiro (seção 5) passa a contar a partir da v16. Testes em `fonte-e-ferramentas/testes/` (rodar com `rodar_testes.sh`). |
 | 18/11/2026 14:38 | Criação a partir de `BACKEND.md`, `PLANO_SUPABASE.md`, `AUDITORIA_2026-11-16.md`, `INDICE.md`, SQL de 18/11 e código da v14. Mapa do código, problemas E1–E5, estrutura alvo, roteiro v15–v20, regras de trabalho e skills recomendadas. |
