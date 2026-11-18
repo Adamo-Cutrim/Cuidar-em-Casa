@@ -33,11 +33,19 @@ Gerado em 18/11/2026. Esta pasta reúne tudo o que existe do projeto "APP para H
 - Chave pública (publishable), pode ficar no navegador: `sb_publishable_Tuay0Raxi1UIqQLi1pNrcA_hqdThXOV`.
 - **Nunca** colocar a chave `service_role` nem senhas em arquivos. Não há segredos nesta pasta.
 - Esquema normalizado com RLS: `profiles`, `companies`, `patients`, `visits`, `recurrences`, `recurrence_exceptions`, `service_types`. SQL em `backend/sql/2026-11-18_migracoes_aplicadas.sql` (registro, não rodar de novo). Advisors de segurança limpos.
-- Tabela temporária `public.site_stage` (restos da tentativa de publicar o site pelo banco): **apagar** (`drop table public.site_stage;`) quando o deploy estiver feito. Não tem leitura pública.
+- A tabela temporária `public.site_stage` (restos da tentativa de publicar o site pelo banco) foi **apagada em 18/11/2026** depois do deploy (migração `20261118195029_remove_site_stage`, SQL em `backend/sql/2026-11-18_remove_site_stage.sql`).
 - Plano Free: sem backup automático e pausa após 1 semana sem uso. Dados reais de pacientes só no plano Pro.
 
 ## Estado do deploy (pedido principal do usuário: testar no celular)
-**Não concluído.** Em 18/11/2026 (Claude Code) o `site/` foi adaptado ao esquema normalizado do banco (v15): a versão anterior gravava no esquema antigo em jsonb e falharia contra o banco atual. Agora passa em 57 de 57 verificações contra um mock que reproduz o esquema real, e as gravações foram conferidas em SQL no banco real (transação desfeita). Falta:
+**Concluído em 18/11/2026.** Detalhes abaixo. Histórico: em 18/11/2026 (Claude Code) o `site/` foi adaptado ao esquema normalizado do banco (v15): a versão anterior gravava no esquema antigo em jsonb e falharia contra o banco atual. Agora passa em 57 de 57 verificações contra um mock que reproduz o esquema real, e as gravações foram conferidas em SQL no banco real (transação desfeita).
+
+**No ar:** https://cuidar-em-casa-three.vercel.app
+- Projeto Vercel `cuidar-em-casa` (`prj_CTGMLSAzqRuUiyhAnDexkAOs3boB`), time `team_5JcllrpkR3M3EK72I0E7TOLf`, ligado ao GitHub `Adamo-Cutrim/cuidar-em-casa`. Pasta publicada: `cuidar-em-casa-contexto/site`, sem framework e sem build. **Cada merge na `main` publica sozinho.**
+- Proteção de login da Vercel desligada (o site é estático; quem protege os dados é a RLS). Cabeçalhos do `vercel.json` (CSP, HSTS etc.) conferidos no ar.
+- Supabase Auth: Site URL e Redirect URLs (`https://cuidar-em-casa-three.vercel.app/**`) configuradas pelo usuário.
+- Teste do usuário no celular, com o próprio e-mail: conta criada e confirmada, empresa e paciente com recorrência cadastrados, app instalado na tela inicial. Registros do Supabase sem nenhum erro 4xx/5xx.
+
+Passos que estavam pendentes (todos feitos):
 1. Publicar `site/` na Vercel (conta pessoal, team `team_5JcllrpkR3M3EK72I0E7TOLf`). O ambiente do Claude.ai não alcança vercel.com nem GitHub. **Caminho mais simples no Claude Code:** na pasta `site/`, rodar `vercel --prod` (ou ligar um repositório GitHub). Projeto sem framework, sem build, pasta de saída = a própria pasta.
 2. Garantir que a URL de produção seja pública (desligar Vercel Authentication/SSO protection do projeto, se estiver ligada).
 3. No painel do Supabase (Authentication, URL Configuration): colocar a URL da Vercel em **Site URL** e em **Redirect URLs**; decidir sobre "Confirm email"; ligar proteção contra senhas vazadas. O SMTP embutido só envia para e-mails de membros da organização.
