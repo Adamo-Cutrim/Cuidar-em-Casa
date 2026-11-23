@@ -253,6 +253,8 @@ body.locked .app,body.locked .fab,body.locked .tabbar{display:none}
 .soon{background:var(--surface);border:1px dashed var(--field);border-radius:18px;padding:20px 16px;text-align:center;color:var(--muted)}
 .soon strong{display:block;color:var(--ink);font:650 17px/1.2 var(--display);margin-bottom:6px}
 .sec{margin-top:18px;padding-top:6px;border-top:1px solid var(--line)}
+.imp-sum{margin:0 0 12px;padding-left:20px}
+.imp-sum li{margin-bottom:6px}
 .sec h3{font:650 18px/1.2 var(--display);padding-top:12px}
 .confirm{display:grid;gap:10px;background:var(--alert-soft);color:var(--alert-ink);border-radius:14px;padding:12px}
 .confirm[hidden]{display:none}

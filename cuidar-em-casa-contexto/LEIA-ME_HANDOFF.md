@@ -55,11 +55,11 @@ Passos que estavam pendentes (todos feitos):
 
 ## Pendências conhecidas
 - ~~Google Fonts~~ hospedado junto com o site em 23/11/2026 (`site/fonts/`, licença OFL em `fonts/LICENCAS.txt`; CSP sem domínios de terceiros em `style-src` e `font-src`). Auditoria D fechada.
-- ~~Problemas E1 a E5~~ corrigidos em 23/11/2026 (v16 parte 1). Falta, para fechar a v16: fontes locais e exportar/importar backup JSON. Fonte do código agora é `site/` (edição direta).
+- ~~Problemas E1 a E5~~, ~~fontes locais~~ e ~~backup JSON (baixar e restaurar)~~ prontos em 23/11/2026: **v16 fechada** (`versoes/v16_2026-11-23_1754_site/`). Fonte do código agora é `site/` (edição direta). Próxima etapa do roteiro: v17, reorganizar em módulos sem mudar comportamento.
 - Testes: `fonte-e-ferramentas/testes/rodar_testes.sh` roda também no Windows (Git Bash + Python 3 + Playwright). Eles **não detectam** violações de CSP; para isso há a opção `CSP_ESTRITA=1` (só aplica o cabeçalho, a conferência é por console/estilo calculado).
 - Decisões em aberto: `BACKEND.md` seção 11.
 - LGPD: dados de saúde são sensíveis; validar com profissional de proteção de dados antes de usar dados reais.
 
 ## Integridade
-`site/app.js` sha256 `26fde9a34c0214a71f05684cd0e68c549de7f6c278f5f6babc9e3f7c4fd8598f` (v15)
-`site/styles.css` sha256 `08d3f05f48ae96cd4b4e650686448430969f9f19be7ffcbd2a0e6c557838ebdf`
+`site/app.js` sha256 `a51fda118a5786d67d6444cbb23c2e16fcbbc919b2c67197a92fea552268f10b` (v16)
+`site/styles.css` sha256 `c40017326b8c6fefdac84369afd5b7a61662376114ef4258c8bbb35442d5ce92`

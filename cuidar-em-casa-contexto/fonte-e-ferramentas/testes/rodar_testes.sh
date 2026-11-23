@@ -27,3 +27,5 @@ sleep 1
 $PY "$AQUI/t1.py"
 $PY "$AQUI/t2.py" | tee "$SHOT_DIR/t2_saida.txt"
 grep -q ' 0 falhas' "$SHOT_DIR/t2_saida.txt"
+$PY "$AQUI/t3.py" | tee "$SHOT_DIR/t3_saida.txt"
+grep -q ' 0 falhas' "$SHOT_DIR/t3_saida.txt"

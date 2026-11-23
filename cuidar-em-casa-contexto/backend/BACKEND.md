@@ -361,6 +361,14 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 3. Ao importar (mapa campo a campo na seção 9.6): descartar tudo que tiver `ex: true` (dados de exemplo); gerar `uuid` novos e **remapear** `empresaId` → `company_id` e `pacienteId` → `patient_id` (os ids atuais são strings curtas, não UUID); importar **na ordem** empresas, pacientes, depois visitas, recorrências e exceções (as FKs exigem); `empresaId` vazio ou apontando para empresa que não existe vira `company_id = null`; visitas cujo paciente não existe são descartadas e contadas no relatório da importação; `fim` vazio vira `null`; `serie`/`serieData` viram só `serie_data`; `S.tipos` vira linhas de `service_types`; ignorar `rev` e `persisted`; campos extras desconhecidos que o `normalize()` preserva são descartados.
 4. Conferir contagens (pacientes, empresas, visitas) e o total de valores por mês **antes** de apagar qualquer coisa do app antigo.
 
+**Implementado na v16 (23/11/2026)** no botão *Restaurar backup (JSON)* do Perfil. Diferenças em relação ao plano acima:
+- Só **acrescenta**: nada é apagado nem sobrescrito. Item cujo id já existe na conta é ignorado e contado.
+- A chave primária das tabelas é `id` sozinho, então importar o id de **outra conta** bateria na RLS e travaria as gravações. Por isso todo item do arquivo ganha `uuid` calculado de `usuário|bkp|id original` (`bkpUuid`): igual a cada importação na mesma conta (não duplica, nem depois de recarregar) e diferente entre contas. Referências (`empresaId`, `pacienteId`, `serie`) são remapeadas junto.
+- Empresa ausente do arquivo vira particular e atendimento sem paciente é descartado, ambos contados na tela de confirmação, que também mostra a data do backup e avisa que os exemplos serão apagados.
+- Perfil do arquivo não é restaurado (só empresas, pacientes, atendimentos e tipos). Tipos novos são somados à lista.
+- Limite de 5 MB por arquivo. Formato: `{app:'cuidar-em-casa', versao:1, exportadoEm, perfil, tipos, empresas, pacientes, atendimentos}`; `ex:true` nunca entra.
+- Testes: `fonte-e-ferramentas/testes/t3.py`.
+
 ---
 
 ## 11. Pontos em aberto (decidir antes de implementar)
@@ -412,6 +420,7 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 | 18/11/2026 | Descoberto o projeto Supabase de testes já existente, com esquema jsonb por linha (RLS, vazio) e a tabela `site_stage` com leitura pública. Verificado e testado o isolamento entre 2 usuários (desfeito). |
 | 18/11/2026 16:51 | (Claude Code) Site publicado na Vercel (projeto `cuidar-em-casa`, ligado ao GitHub, deploy automático da `main`). Usuário configurou as URLs do Auth e testou no celular sem erros. Tabela `site_stage` apagada (migração `remove_site_stage`). Pontos 7 e 11 resolvidos. |
 | 18/11/2026 16:13 | (Claude Code) v15: camada de dados do site adaptada ao esquema normalizado (seção 9.7). Mock e testes reescritos para o esquema real. SQL das migrações de 17/11 exportado para `backend/sql/2026-11-17/`. Ponto 15 esclarecido; pontos 16 e 17 novos. |
+| 23/11/2026 | (Claude Code) v16: restaurar backup JSON implementado (seção 10). Descoberto que a PK é global (`id`), o que exige remapear ids ao importar de outra conta. |
 | 18/11/2026 | Por decisão do usuário: (1) leitura pública de `site_stage` fechada; (2) migração para o **esquema normalizado** (companies, patients, visits, recurrences, recurrence_exceptions, service_types; FKs compostas com `user_id`, cascatas, constraints, índices, RLS), com trava contra perda de dados. Testes de isolamento, FKs, cascatas e constraints passaram (desfeitos). Índice adicional em `recurrences` após advisor. SQL salvo em `backend/sql/2026-11-18_migracoes_aplicadas.sql`. Seção 9 reescrita; seção 10 atualizada; pontos em aberto 10 a 15. |
 
 ---
