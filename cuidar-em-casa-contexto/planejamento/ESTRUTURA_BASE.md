@@ -239,6 +239,7 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 
 | Data | Mudança |
 |---|---|
+| 23/11/2026 | (Claude Code) v16 parte 2: fontes Bricolage Grotesque e Figtree hospedadas em `site/fonts/` (latin e latin-ext, woff2, 138 KB no total); removidos os links do Google Fonts; CSP `font-src 'self'`, sem `fonts.googleapis.com`; cache longo em `/fonts/`. Fecha a auditoria D. Falta o backup JSON para fechar a v16. |
 | 23/11/2026 | (Claude Code) v16 parte 1: E1 a E5 corrigidos no `site/` (edição direta; `build_site.py` não é mais a fonte). Testes de navegador rodam no Windows. Fontes locais e backup JSON ainda faltam para fechar a v16 e salvar `versoes/v16_*`. |
 | 18/11/2026 16:51 | (Claude Code) Host escolhido: Vercel, ligada ao GitHub (deploy automático da `main`). Site no ar e testado pelo usuário no celular. Seção 2 atualizada. |
 | 18/11/2026 16:13 | (Claude Code) v15 salva como pasta `versoes/v15_2026-11-18_1613_site/`: site independente com Supabase Auth e dados no esquema normalizado. A numeração do roteiro (seção 5) passa a contar a partir da v16. Testes em `fonte-e-ferramentas/testes/` (rodar com `rodar_testes.sh`). |

@@ -326,7 +326,7 @@ class Static(BaseHTTPRequestHandler):
         d = os.path.join(os.path.normpath(SITE_DIR), ''); p = self.path.split('?')[0].split('#')[0]; p = 'index.html' if p == '/' else p.lstrip('/')
         f = os.path.normpath(os.path.join(d, p))
         if not f.startswith(d) or not os.path.isfile(f): self.send_response(404); self.end_headers(); return
-        data = open(f, 'rb').read(); ct = {'html': 'text/html; charset=utf-8', 'js': 'text/javascript; charset=utf-8', 'css': 'text/css', 'svg': 'image/svg+xml', 'webmanifest': 'application/manifest+json', 'json': 'application/json'}[f.rsplit('.', 1)[1]]
+        data = open(f, 'rb').read(); ct = {'html': 'text/html; charset=utf-8', 'js': 'text/javascript; charset=utf-8', 'css': 'text/css', 'svg': 'image/svg+xml', 'webmanifest': 'application/manifest+json', 'json': 'application/json', 'woff2': 'font/woff2'}[f.rsplit('.', 1)[1]]
         self.send_response(200); self.send_header('Content-Type', ct); self.send_header('Content-Length', str(len(data)))
         for h in json.load(open(d + 'vercel.json'))['headers'][0]['headers']: self.send_header(h['key'], h['value'])
         self.end_headers(); self.wfile.write(data)
