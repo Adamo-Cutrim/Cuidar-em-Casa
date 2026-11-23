@@ -14,6 +14,12 @@ export SITE_DIR="$AQUI_PY/site_test" SHOT_DIR="${SHOT_DIR:-$TMP_ABS/}"
 rm -rf "$AQUI/site_test"; cp -r "$AQUI/../../site" "$AQUI/site_test"
 # O site de teste fala com o mock local em vez do Supabase real.
 sed -i "s#https://ynbqblvdtgwabczbssfp.supabase.co#http://127.0.0.1:8766#g" "$AQUI/site_test/app.js" "$AQUI/site_test/vercel.json"
+# CSP_ESTRITA=1: testa com style-src sem 'unsafe-inline' (como ficaria a producao depois da E3).
+if [ -n "${CSP_ESTRITA:-}" ]; then
+  sed -i "s/style-src 'self' 'unsafe-inline'/style-src 'self'/" "$AQUI/site_test/vercel.json"
+  if grep -q "unsafe-inline" "$AQUI/site_test/vercel.json"; then echo "CSP estrita nao aplicada"; exit 1; fi
+  echo "(CSP estrita ativa: sem unsafe-inline em style-src)"
+fi
 $PY "$AQUI/harness.py" mock & M=$!
 $PY "$AQUI/harness.py" static & S=$!
 trap 'kill $M $S 2>/dev/null; rm -rf "$AQUI/site_test"' EXIT

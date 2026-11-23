@@ -71,15 +71,15 @@ O arquivo já está dividido em blocos comentados. Este é o mapa para quem for 
 - Tokens em `:root` (cores, 6 paletas de empresa `c0`..`c5`, fontes, coluna de 520px). Visual claro, mobile, com safe-area.
 - Blocos: cabeçalho, botões, semana, rota do dia, etiquetas, listas, navegação, formulários, janela, entrada e conta, relatório, detalhes, campos de data/hora.
 
-### 3.3 Problemas encontrados nesta análise (ainda não corrigidos)
+### 3.3 Problemas encontrados nesta análise (**E1 a E5 corrigidos em 23/11/2026, v16 parte 1**)
 
 | # | Problema | Efeito | Onde |
 |---|---|---|---|
-| E1 | A classe `.route` é definida duas vezes: na rota do dia (`ol.route`, `margin:0`) e na arte da tela de entrada (`background: accent-soft`, `padding`, `margin-bottom:24px`). A segunda vence. | A lista de atendimentos da agenda herda fundo verde-claro, borda arredondada e espaçamento da arte do login. **Verificar na tela** antes de corrigir. | CSS "Rota do dia" × "Entrada e conta" |
-| E2 | `maxlength` dos campos diferente do limite do validador/banco: tipo de atendimento 40 (limite 60), telefone do perfil 30 (limite 60), nome 80. | Sem perda de dado, mas regra duplicada e inconsistente. Centralizar limites num só lugar. | `tipoField`, `tipoForm`, `openProfile` |
-| E3 | Estilos inline (`style="..."`) em perfil, menu, rótulos de busca e dicas. | Impede CSP sem `unsafe-inline` (auditoria C). | `openMenu`, `openProfile`, `viewPacientes`, `linkForm`, `viewTipos` |
-| E4 | Classe utilitária `sr` usada mas não definida no CSS (o efeito vem do `style` inline). | Mesma causa de E3. | `viewPacientes` |
-| E5 | Parâmetro sem uso `keepOffset` em `setWeek`. | Só limpeza. | ações |
+| E1 ✅ | A classe `.route` é definida duas vezes: na rota do dia (`ol.route`, `margin:0`) e na arte da tela de entrada (`background: accent-soft`, `padding`, `margin-bottom:24px`). A segunda vence. | A lista de atendimentos da agenda herda fundo verde-claro, borda arredondada e espaçamento da arte do login. **Verificado na tela e corrigido:** a arte do login agora usa `.gate-art`. | CSS "Rota do dia" × "Entrada e conta" |
+| E2 ✅ | `maxlength` dos campos diferente do limite do validador/banco: tipo de atendimento 40 (limite 60), telefone do perfil 30 (limite 60), nome 80. | Sem perda de dado, mas regra duplicada e inconsistente. Corrigido: constante `LIM` em `app.js` usada pelo validador e pelos campos (tipo 60, telefone 60, registro 60, profissão 100, cidade 100, nome 80). | `tipoField`, `tipoForm`, `openProfile` |
+| E3 ✅ | Estilos inline (`style="..."`) em perfil, menu, rótulos de busca e dicas. | Impede CSP sem `unsafe-inline` (auditoria C). Corrigido: classes no CSS, zero `style="` no app. O `vercel.json` ainda tem `'unsafe-inline'` em `style-src`; removê-lo é um passo à parte. | `openMenu`, `openProfile`, `viewPacientes`, `linkForm`, `viewTipos` |
+| E4 ✅ | Classe utilitária `sr` usada mas não definida no CSS (o efeito vem do `style` inline). | Mesma causa de E3. | `viewPacientes` |
+| E5 ✅ | Parâmetro sem uso `keepOffset` em `setWeek`. | Só limpeza. Removido. | ações |
 
 ---
 
@@ -239,6 +239,7 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 
 | Data | Mudança |
 |---|---|
+| 23/11/2026 | (Claude Code) v16 parte 1: E1 a E5 corrigidos no `site/` (edição direta; `build_site.py` não é mais a fonte). Testes de navegador rodam no Windows. Fontes locais e backup JSON ainda faltam para fechar a v16 e salvar `versoes/v16_*`. |
 | 18/11/2026 16:51 | (Claude Code) Host escolhido: Vercel, ligada ao GitHub (deploy automático da `main`). Site no ar e testado pelo usuário no celular. Seção 2 atualizada. |
 | 18/11/2026 16:13 | (Claude Code) v15 salva como pasta `versoes/v15_2026-11-18_1613_site/`: site independente com Supabase Auth e dados no esquema normalizado. A numeração do roteiro (seção 5) passa a contar a partir da v16. Testes em `fonte-e-ferramentas/testes/` (rodar com `rodar_testes.sh`). |
 | 18/11/2026 14:38 | Criação a partir de `BACKEND.md`, `PLANO_SUPABASE.md`, `AUDITORIA_2026-11-16.md`, `INDICE.md`, SQL de 18/11 e código da v14. Mapa do código, problemas E1–E5, estrutura alvo, roteiro v15–v20, regras de trabalho e skills recomendadas. |
