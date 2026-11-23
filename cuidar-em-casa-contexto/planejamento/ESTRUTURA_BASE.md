@@ -239,6 +239,7 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 
 | Data | Mudança |
 |---|---|
+| 23/11/2026 19:10 | (Claude Code) Deploy automático **voltou** (usuário reconectou o Git na Vercel; o merge do PR #8 gerou deploy sozinho). A correção de 18:30 abaixo vale só para o período PR #2 a #7. |
 | 23/11/2026 18:30 | (Claude Code) v16 publicada em produção por redeploy manual. **Correção:** a frase "deploy automático a cada merge na `main`" (seções 2 e histórico de 18/11) não se confirmou; ver `LEIA-ME_HANDOFF.md`. |
 | 23/11/2026 17:54 | (Claude Code) **v16 fechada** (`versoes/v16_2026-11-23_1754_site/`). Parte 3: restaurar backup JSON no Perfil (`planImport`/`applyImport` em `app.js`), com ids calculados por conta, contagem de itens ignorados/ajustados/descartados antes de confirmar, e baixar backup sem exemplos. Testes novos em `testes/t3.py` (44 verificações). Próxima etapa do roteiro: v17 (reorganizar em módulos, sem mudar comportamento). |
 | 23/11/2026 | (Claude Code) v16 parte 2: fontes Bricolage Grotesque e Figtree hospedadas em `site/fonts/` (latin e latin-ext, woff2, 138 KB no total); removidos os links do Google Fonts; CSP `font-src 'self'`, sem `fonts.googleapis.com`; cache longo em `/fonts/`. Fecha a auditoria D. Falta o backup JSON para fechar a v16. |
