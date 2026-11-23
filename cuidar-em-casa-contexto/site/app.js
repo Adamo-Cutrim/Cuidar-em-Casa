@@ -656,6 +656,104 @@ function dlFile(name,text,mime){
   setTimeout(function(){a.remove();URL.revokeObjectURL(u);},2000);
 }
 
+/* ---------- backup: baixar e restaurar ----------
+   Arquivo JSON {app,versao,exportadoEm,perfil,tipos,empresas,pacientes,atendimentos}.
+   Dados de exemplo (ex:true) nunca entram no arquivo nem voltam dele.
+   Restaurar só ACRESCENTA: o que já existe (mesmo id) fica como está; nada é apagado nem sobrescrito.
+   Regras de BACKEND.md seção 10: paciente de empresa que não está no arquivo vira particular;
+   atendimento sem paciente é descartado. Tudo é contado e mostrado antes de confirmar. */
+const BKP_MAX=5*1024*1024;
+let pendingImport=null;
+function backupObject(){
+  const real=x=>!x.ex;
+  return {app:'cuidar-em-casa',versao:1,exportadoEm:new Date().toISOString(),perfil:S.perfil,tipos:S.tipos||null,
+    empresas:S.companies.filter(real),pacientes:S.patients.filter(real),atendimentos:S.visits.filter(real)};
+}
+/* Ids do arquivo -> ids desta conta. A chave primária do banco é o id sozinho: importar o id de OUTRA conta
+   bateria numa linha que não é sua e travaria a gravação. Então cada item do arquivo ganha um uuid calculado
+   do id original e do usuário: sempre o mesmo para a mesma conta (importar duas vezes não duplica) e diferente
+   entre contas. O que já existe aqui, com o id original ou com o calculado, é reconhecido e mantido. */
+const bkpUuid=id=>hashUuid(ses.user.id+'|bkp|'+id);
+const wasThere=(have,id)=>have.has(id)||have.has(dbId(id))||have.has(bkpUuid(id));
+function mapId(have,id){if(have.has(id)) return id;const d=dbId(id);return have.has(d)?d:bkpUuid(id);}
+function planImport(o){
+  if(!o||typeof o!=='object'||Array.isArray(o)||o.app!=='cuidar-em-casa') return {erro:'Este arquivo não é um backup do Cuidar em Casa.'};
+  if(o.versao!==1) return {erro:'Este backup é de uma versão que o app não conhece.'};
+  if(!ses||!ses.user) return {erro:'Entre na sua conta para restaurar um backup.'};
+  const n=normalize({companies:o.empresas,patients:o.pacientes,visits:o.atendimentos,tipos:o.tipos});
+  const realIds=l=>new Set(l.filter(x=>!x.ex).map(x=>x.id));
+  const haveC=realIds(S.companies),haveP=realIds(S.patients),haveV=realIds(S.visits);
+  const fileC=n.companies.filter(x=>!x.ex),fileP=n.patients.filter(x=>!x.ex),fileV=n.visits.filter(x=>!x.ex);
+  const inC=new Set(fileC.map(x=>x.id)),inP=new Set(fileP.map(x=>x.id));
+  const r={companies:[],patients:[],visits:[],tipoNovos:[],jaTinha:0,semEmpresa:0,semPaciente:0,
+    data:okDate(String(o.exportadoEm||'').slice(0,10))?String(o.exportadoEm).slice(0,10):''};
+  fileC.forEach(function(c){
+    if(wasThere(haveC,c.id)){r.jaTinha++;return;}
+    c.id=mapId(haveC,c.id);r.companies.push(c);
+  });
+  fileP.forEach(function(p){
+    if(wasThere(haveP,p.id)){r.jaTinha++;return;}
+    p.id=mapId(haveP,p.id);
+    if(p.empresaId){
+      if(inC.has(p.empresaId)||wasThere(haveC,p.empresaId)) p.empresaId=mapId(haveC,p.empresaId);
+      else{p.empresaId='';r.semEmpresa++;}
+    }
+    r.patients.push(p);
+  });
+  fileV.forEach(function(v){
+    if(wasThere(haveV,v.id)){r.jaTinha++;return;}
+    if(!(inP.has(v.pacienteId)||wasThere(haveP,v.pacienteId))){r.semPaciente++;return;}
+    v.id=mapId(haveV,v.id);v.pacienteId=mapId(haveP,v.pacienteId);
+    if(v.serie) v.serie=mapId(haveP,v.serie);
+    r.visits.push(v);
+  });
+  if(Array.isArray(n.tipos)){
+    const have=new Set(tiposList().map(tipoKey));
+    n.tipos.forEach(function(t){if(!have.has(tipoKey(t))){have.add(tipoKey(t));r.tipoNovos.push(t);}});
+  }
+  r.nada=!r.companies.length&&!r.patients.length&&!r.visits.length&&!r.tipoNovos.length;
+  return r;
+}
+const plural=(n,um,varios)=>n+' '+(n===1?um:varios);
+function openImport(p){
+  pendingImport=p.nada?null:p;
+  let b;
+  if(p.nada) b='<p>Nada novo neste arquivo: tudo o que ele tem já está no app.</p>'+(p.semPaciente?'<p class="hint">'+plural(p.semPaciente,'atendimento foi ignorado porque o paciente dele não está no arquivo.','atendimentos foram ignorados porque o paciente deles não está no arquivo.')+'</p>':'')+
+    '<div class="sheet-actions"><button type="button" class="btn primary" data-action="close-sheet">Fechar</button></div>';
+  else{
+    let li='<li>Serão adicionados: <strong>'+plural(p.companies.length,'empresa','empresas')+'</strong>, <strong>'+plural(p.patients.length,'paciente','pacientes')+'</strong> e <strong>'+plural(p.visits.length,'atendimento','atendimentos')+'</strong>.</li>';
+    if(p.tipoNovos.length) li+='<li>'+plural(p.tipoNovos.length,'tipo de atendimento novo.','tipos de atendimento novos.')+'</li>';
+    if(p.jaTinha) li+='<li>'+plural(p.jaTinha,'item já existe no app e fica como está.','itens já existem no app e ficam como estão.')+'</li>';
+    if(p.semEmpresa) li+='<li>'+plural(p.semEmpresa,'paciente estava ligado a uma empresa que não está no arquivo e entra como particular.','pacientes estavam ligados a uma empresa que não está no arquivo e entram como particulares.')+'</li>';
+    if(p.semPaciente) li+='<li>'+plural(p.semPaciente,'atendimento será descartado porque o paciente dele não está no arquivo.','atendimentos serão descartados porque o paciente deles não está no arquivo.')+'</li>';
+    if(hasExamples()) li+='<li>Os dados de exemplo serão apagados.</li>';
+    b=(p.data?'<p>Backup de '+esc(isoToBr(p.data))+'.</p>':'')+'<ul class="imp-sum">'+li+'</ul><p class="hint">Seus dados atuais não são alterados nem apagados.</p>'+
+      '<div class="sheet-actions"><button type="button" class="btn primary" data-action="import-confirm">Restaurar</button><button type="button" class="btn ghost" data-action="close-sheet">Cancelar</button></div>';
+  }
+  openSheet('Restaurar backup',b);
+}
+function applyImport(){
+  const p=pendingImport;pendingImport=null;
+  if(!p) return;
+  S.patients=S.patients.filter(x=>!x.ex).concat(p.patients);
+  S.companies=S.companies.filter(x=>!x.ex).concat(p.companies);
+  S.visits=S.visits.filter(x=>!x.ex).concat(p.visits);
+  if(p.tipoNovos.length){ensureTipos();S.tipos=S.tipos.concat(p.tipoNovos).slice(0,200);}
+  if(ui.fcomp!=='all'&&ui.fcomp!=='none'&&!findCompany(ui.fcomp)) ui.fcomp='all';
+  commit();closeSheet();renderAll();
+  toast('Backup restaurado: '+plural(p.patients.length,'paciente','pacientes')+' e '+plural(p.visits.length,'atendimento','atendimentos')+'.');
+}
+function readBackupFile(file){
+  if(!file) return;
+  if(file.size>BKP_MAX){toast('Arquivo grande demais para ser um backup.');return;}
+  file.text().then(function(txt){
+    let o;try{o=JSON.parse(txt);}catch(e){toast('Não foi possível ler este arquivo.');return;}
+    const p=planImport(o);
+    if(p.erro){toast(p.erro);return;}
+    openImport(p);
+  },function(){toast('Não foi possível ler este arquivo.');});
+}
+
 /* ---------- relatório de faturamento ----------
    Valor de cada atendimento = valor cadastrado no paciente. Feito = realizado. Agendado = previsto.
    Cancelados não entram. Atendimentos recorrentes ainda não registrados contam como agendados. */
@@ -957,7 +1055,7 @@ function openProfile(){
     '<label for="pf-reg">Registro profissional</label><input id="pf-reg" name="registro" maxlength="'+LIM.registro+'" placeholder="Ex.: COREN 000000" value="'+val(pf.registro)+'">'+
     '<label for="pf-cid">Cidade ou região de atuação</label><input id="pf-cid" name="cidade" maxlength="'+LIM.cidade+'" value="'+val(pf.cidade)+'">'+
     '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Salvar perfil</button></div></form>'+
-    '<div class="sec"><h3>Seus dados</h3><p class="hint">O backup é um arquivo com todos os seus pacientes, empresas e atendimentos. Guarde em local seguro: ele não tem senha.</p><div class="sheet-actions"><button type="button" class="btn" data-action="backup">'+ic('download')+'Baixar backup (JSON)</button></div></div>'+
+    '<div class="sec"><h3>Seus dados</h3><p class="hint">O backup é um arquivo com todos os seus pacientes, empresas e atendimentos (sem os dados de exemplo). Guarde em local seguro: ele não tem senha. Restaurar acrescenta ao que você já tem; nada é apagado nem sobrescrito.</p><div class="sheet-actions"><button type="button" class="btn" data-action="backup">'+ic('download')+'Baixar backup (JSON)</button><button type="button" class="btn" data-action="import-pick">'+ic('upload')+'Restaurar backup (JSON)</button><input type="file" id="imp-file" data-role="import-file" accept="application/json,.json" hidden></div></div>'+
     '<div class="sec"><h3>Segurança</h3><div class="sheet-actions"><button type="button" class="btn" data-action="open-password">'+ic('lock')+'Alterar senha</button><button type="button" class="btn" data-action="logout">'+ic('logout')+'Sair da conta</button></div></div>'+
     '<div class="sheet-actions"><button type="button" class="btn ghost" data-action="open-menu">Voltar ao menu</button></div>';
   openSheet('Perfil',b);
@@ -1686,8 +1784,11 @@ const A={
     else openSoon(g);
   },
   'logout':function(){sair();},
+  'import-pick':function(){const i=$('#imp-file');if(i) i.click();},
+  'import-confirm':function(){applyImport();},
   'backup':function(){
-    const o={app:'cuidar-em-casa',versao:1,exportadoEm:new Date().toISOString(),perfil:S.perfil,tipos:S.tipos||null,empresas:S.companies,pacientes:S.patients,atendimentos:S.visits};
+    const o=backupObject();
+    if(!o.empresas.length&&!o.pacientes.length&&!o.atendimentos.length){toast('Ainda não há dados seus para guardar.');return;}
     dlFile('cuidar-em-casa_backup_'+iso(new Date())+'.json',JSON.stringify(o,null,2),'application/json');
     toast('Backup baixado.');
   },
@@ -1807,6 +1908,7 @@ document.addEventListener('input',function(e){
 });
 document.addEventListener('change',function(e){
   const t=e.target;
+  if(t&&t.dataset&&t.dataset.role==='import-file'){const f=t.files&&t.files[0];t.value='';readBackupFile(f);return;}
   if(t&&t.dataset&&t.dataset.role==='rep-emp'){
     ui.rep.emp=t.value;
     const p=findPatient(ui.rep.pac);
