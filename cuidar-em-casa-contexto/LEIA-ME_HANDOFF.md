@@ -54,7 +54,7 @@ Passos que estavam pendentes (todos feitos):
 6. Apagar `site_stage`; salvar `versoes/v15_...` e atualizar `INDICE.md` e o histórico de `ESTRUTURA_BASE.md`.
 
 ## Pendências conhecidas
-- Google Fonts continua sendo terceiro (vaza IP): hospedar as fontes junto (auditoria D).
+- ~~Google Fonts~~ hospedado junto com o site em 23/11/2026 (`site/fonts/`, licença OFL em `fonts/LICENCAS.txt`; CSP sem domínios de terceiros em `style-src` e `font-src`). Auditoria D fechada.
 - ~~Problemas E1 a E5~~ corrigidos em 23/11/2026 (v16 parte 1). Falta, para fechar a v16: fontes locais e exportar/importar backup JSON. Fonte do código agora é `site/` (edição direta).
 - Testes: `fonte-e-ferramentas/testes/rodar_testes.sh` roda também no Windows (Git Bash + Python 3 + Playwright). Eles **não detectam** violações de CSP; para isso há a opção `CSP_ESTRITA=1` (só aplica o cabeçalho, a conferência é por console/estilo calculado).
 - Decisões em aberto: `BACKEND.md` seção 11.
