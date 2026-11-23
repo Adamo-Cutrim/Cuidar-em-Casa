@@ -55,7 +55,8 @@ Passos que estavam pendentes (todos feitos):
 
 ## Pendências conhecidas
 - Google Fonts continua sendo terceiro (vaza IP): hospedar as fontes junto (auditoria D).
-- Problemas E1 a E5 do `ESTRUTURA_BASE.md` (seção 3.3) não corrigidos.
+- ~~Problemas E1 a E5~~ corrigidos em 23/11/2026 (v16 parte 1). Falta, para fechar a v16: fontes locais e exportar/importar backup JSON. Fonte do código agora é `site/` (edição direta).
+- Testes: `fonte-e-ferramentas/testes/rodar_testes.sh` roda também no Windows (Git Bash + Python 3 + Playwright). Eles **não detectam** violações de CSP; para isso há a opção `CSP_ESTRITA=1` (só aplica o cabeçalho, a conferência é por console/estilo calculado).
 - Decisões em aberto: `BACKEND.md` seção 11.
 - LGPD: dados de saúde são sensíveis; validar com profissional de proteção de dados antes de usar dados reais.
 

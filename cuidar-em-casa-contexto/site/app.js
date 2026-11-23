@@ -204,7 +204,7 @@ function readLocal(k){try{return localStorage.getItem(k);}catch(e){return null;}
 function writeLocal(k,v){try{localStorage.setItem(k,v);}catch(e){}}
 /* Tudo que vem de fora (armazenamento do aparelho ou da conta) passa por aqui antes de ser usado.
    Ids só podem ter letras, números, _ e -, porque entram em atributos HTML. Textos têm tamanho máximo. */
-const SHORT=300,LONG=5000,ISO_D=/^\d{4}-\d{2}-\d{2}$/,HHMM=/^([01]\d|2[0-3]):[0-5]\d$/;
+const SHORT=300,LONG=5000,LIM={nome:80,tel:60,tipo:60,profissao:100,registro:60,cidade:100},ISO_D=/^\d{4}-\d{2}-\d{2}$/,HHMM=/^([01]\d|2[0-3]):[0-5]\d$/;
 const sid=v=>{const t=String(v==null?'':v).replace(/[^\w-]/g,'_').slice(0,64);return /^__/.test(t)?'i'+t:t;};
 const TXT=(v,n)=>typeof v==='string'?v.slice(0,n||SHORT):(typeof v==='number'&&isFinite(v)?String(v).slice(0,n||SHORT):'');
 const okDate=v=>typeof v==='string'&&ISO_D.test(v)&&brToIso(isoToBr(v))===v;
@@ -255,10 +255,10 @@ function normalize(o){
   o=(o&&typeof o==='object')?o:{};
   const pf=(o.perfil&&typeof o.perfil==='object')?o.perfil:{};
   let tipos;
-  if(Array.isArray(o.tipos)) tipos=Array.from(new Set(o.tipos.filter(x=>typeof x==='string').map(x=>x.trim().replace(/\s+/g,' ').slice(0,60)).filter(Boolean))).slice(0,200);
+  if(Array.isArray(o.tipos)) tipos=Array.from(new Set(o.tipos.filter(x=>typeof x==='string').map(x=>x.trim().replace(/\s+/g,' ').slice(0,LIM.tipo)).filter(Boolean))).slice(0,200);
   const arr=a=>Array.isArray(a)?a:[];
   return {patients:uniqueIds(arr(o.patients).map(normPatient).filter(Boolean)),companies:uniqueIds(arr(o.companies).map(normCompany).filter(Boolean)),visits:uniqueIds(arr(o.visits).map(normVisit).filter(Boolean)),
-    rev:Math.max(0,Math.floor(Number(o.rev))||0),perfil:{nome:TXT(pf.nome,80),tel:TXT(pf.tel,60),profissao:TXT(pf.profissao,100),registro:TXT(pf.registro,60),cidade:TXT(pf.cidade,100)},tipos:tipos,persisted:true};
+    rev:Math.max(0,Math.floor(Number(o.rev))||0),perfil:{nome:TXT(pf.nome,LIM.nome),tel:TXT(pf.tel,LIM.tel),profissao:TXT(pf.profissao,LIM.profissao),registro:TXT(pf.registro,LIM.registro),cidade:TXT(pf.cidade,LIM.cidade)},tipos:tipos,persisted:true};
 }
 function makeDemo(){
   const comps=[
@@ -781,7 +781,7 @@ function pwField(id,name,label,auto){
   return '<label for="'+id+'">'+label+'</label><div class="pwf"><input id="'+id+'" name="'+name+'" type="password" autocomplete="'+auto+'" autocapitalize="off" spellcheck="false"><button type="button" data-action="pw-toggle" aria-pressed="false" aria-label="Mostrar '+label.toLowerCase()+'">Mostrar</button></div>';
 }
 function routeArt(){
-  return '<div class="route" aria-hidden="true"><svg viewBox="0 0 320 104" xmlns="http://www.w3.org/2000/svg">'+
+  return '<div class="gate-art" aria-hidden="true"><svg viewBox="0 0 320 104" xmlns="http://www.w3.org/2000/svg">'+
     '<path class="rt-line" d="M26 70 C 66 70, 86 30, 132 30 S 204 64, 236 62 S 270 34, 292 34"/>'+
     '<circle class="rt-stop" cx="26" cy="70" r="8"/><circle class="rt-stop" cx="132" cy="30" r="8"/><circle class="rt-stop" cx="236" cy="62" r="8"/>'+
     '<text class="rt-t" x="26" y="96" text-anchor="middle">08:30</text><text class="rt-t" x="132" y="58" text-anchor="middle">10:00</text><text class="rt-t" x="236" y="90" text-anchor="middle">14:30</text>'+
@@ -937,7 +937,7 @@ async function doNova(f){
 function openMenu(){
   const c=auth.conta,nt=tiposList().length;
   const row=(go,icon,nome,sub)=>'<li><button type="button" class="row" data-action="menu-go" data-go="'+go+'"><span class="mi">'+ic(icon)+'</span><span class="row-main"><span class="row-name">'+nome+'</span><span class="row-sub">'+sub+'</span></span><span class="go">'+ic('right')+'</span></button></li>';
-  const b=(c?'<div class="sum"><span class="av c0" aria-hidden="true">'+esc(initials(c.nome))+'</span><div><h3 style="font:650 18px/1.2 var(--display)">'+esc(c.nome)+'</h3><p class="sub" style="margin:2px 0 0">'+esc(c.email)+'</p></div></div>':'')+
+  const b=(c?'<div class="sum"><span class="av c0" aria-hidden="true">'+esc(initials(c.nome))+'</span><div><h3 class="sum-name">'+esc(c.nome)+'</h3><p class="sub sum-sub">'+esc(c.email)+'</p></div></div>':'')+
     '<ul class="group">'+
     row('perfil','user','Perfil','Seus dados pessoais e profissionais')+
     row('config','gear','Configurações','Preferências do app')+
@@ -948,14 +948,14 @@ function openMenu(){
 }
 function openProfile(){
   const c=auth.conta||{nome:'',email:''},pf=S.perfil||{};
-  const b='<div class="sum"><span class="av lg c0" aria-hidden="true">'+esc(initials(c.nome))+'</span><div><h3 style="font:650 18px/1.2 var(--display)">'+esc(c.nome)+'</h3><p class="sub" style="margin:2px 0 0">'+esc(c.email)+'</p></div></div>'+
+  const b='<div class="sum"><span class="av lg c0" aria-hidden="true">'+esc(initials(c.nome))+'</span><div><h3 class="sum-name">'+esc(c.nome)+'</h3><p class="sub sum-sub">'+esc(c.email)+'</p></div></div>'+
     '<form id="f-perfil" novalidate>'+
-    '<label for="pf-nome">Nome</label><input id="pf-nome" name="nome" autocomplete="name" maxlength="80" value="'+val(c.nome)+'">'+
+    '<label for="pf-nome">Nome</label><input id="pf-nome" name="nome" autocomplete="name" maxlength="'+LIM.nome+'" value="'+val(c.nome)+'">'+
     '<label for="pf-email">E-mail</label><input id="pf-email" type="email" value="'+val(c.email)+'" readonly aria-describedby="pf-email-h"><p class="hint" id="pf-email-h">É o e-mail que você usa para entrar. Ele não pode ser alterado aqui.</p>'+
-    '<label for="pf-tel">Telefone</label><input id="pf-tel" name="tel" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" value="'+val(pf.tel)+'">'+
-    '<label for="pf-prof">Profissão</label><input id="pf-prof" name="profissao" list="pf-profs" maxlength="60" placeholder="Ex.: Enfermeira" value="'+val(pf.profissao)+'"><datalist id="pf-profs">'+['Enfermeiro(a)','Técnico(a) de enfermagem','Fisioterapeuta','Médico(a)','Fonoaudiólogo(a)','Nutricionista','Psicólogo(a)','Terapeuta ocupacional','Cuidador(a)'].map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>'+
-    '<label for="pf-reg">Registro profissional</label><input id="pf-reg" name="registro" maxlength="40" placeholder="Ex.: COREN 000000" value="'+val(pf.registro)+'">'+
-    '<label for="pf-cid">Cidade ou região de atuação</label><input id="pf-cid" name="cidade" maxlength="60" value="'+val(pf.cidade)+'">'+
+    '<label for="pf-tel">Telefone</label><input id="pf-tel" name="tel" type="tel" inputmode="tel" autocomplete="tel" maxlength="'+LIM.tel+'" value="'+val(pf.tel)+'">'+
+    '<label for="pf-prof">Profissão</label><input id="pf-prof" name="profissao" list="pf-profs" maxlength="'+LIM.profissao+'" placeholder="Ex.: Enfermeira" value="'+val(pf.profissao)+'"><datalist id="pf-profs">'+['Enfermeiro(a)','Técnico(a) de enfermagem','Fisioterapeuta','Médico(a)','Fonoaudiólogo(a)','Nutricionista','Psicólogo(a)','Terapeuta ocupacional','Cuidador(a)'].map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>'+
+    '<label for="pf-reg">Registro profissional</label><input id="pf-reg" name="registro" maxlength="'+LIM.registro+'" placeholder="Ex.: COREN 000000" value="'+val(pf.registro)+'">'+
+    '<label for="pf-cid">Cidade ou região de atuação</label><input id="pf-cid" name="cidade" maxlength="'+LIM.cidade+'" value="'+val(pf.cidade)+'">'+
     '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Salvar perfil</button></div></form>'+
     '<div class="sec"><h3>Seus dados</h3><p class="hint">O backup é um arquivo com todos os seus pacientes, empresas e atendimentos. Guarde em local seguro: ele não tem senha.</p><div class="sheet-actions"><button type="button" class="btn" data-action="backup">'+ic('download')+'Baixar backup (JSON)</button></div></div>'+
     '<div class="sec"><h3>Segurança</h3><div class="sheet-actions"><button type="button" class="btn" data-action="open-password">'+ic('lock')+'Alterar senha</button><button type="button" class="btn" data-action="logout">'+ic('logout')+'Sair da conta</button></div></div>'+
@@ -1063,7 +1063,7 @@ function tipoOptions(sel){
 }
 function tipoField(id,name,value){
   return '<div class="tipof"><select id="'+id+'" name="'+name+'" data-kind="tipo">'+tipoOptions(value)+'</select>'+
-    '<div class="tipo-new" hidden><label for="'+id+'-novo">Nome do novo tipo</label><div class="datef-row"><input id="'+id+'-novo" data-role="tipo-new" type="text" maxlength="40" autocomplete="off" placeholder="Ex.: Troca de sonda"><button type="button" class="btn" data-action="tipo-add">Adicionar</button></div></div></div>';
+    '<div class="tipo-new" hidden><label for="'+id+'-novo">Nome do novo tipo</label><div class="datef-row"><input id="'+id+'-novo" data-role="tipo-new" type="text" maxlength="'+LIM.tipo+'" autocomplete="off" placeholder="Ex.: Troca de sonda"><button type="button" class="btn" data-action="tipo-add">Adicionar</button></div></div></div>';
 }
 /* Atendimentos recorrentes não são gravados um a um: aparecem na agenda a partir do cadastro do paciente.
    Só viram registro quando você conclui, edita, cancela ou exclui um deles. */
@@ -1212,7 +1212,7 @@ function viewPacientes(){
       S.companies.map(c=>'<button type="button" class="fchip'+(ui.fcomp===c.id?' sel':'')+'" data-action="filter" data-id="'+c.id+'">'+esc(c.nome)+'</button>').join('')+
       '<button type="button" class="fchip'+(ui.fcomp==='none'?' sel':'')+'" data-action="filter" data-id="none">Particulares</button></div>';
   }
-  return '<button type="button" class="btn rep-btn" data-action="open-report" data-by="paciente">'+ic('chart')+'Relatório de faturamento</button><div class="search">'+ic('search')+'<label for="q" class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">Buscar paciente</label><input id="q" type="search" placeholder="Buscar por nome, bairro ou empresa" value="'+esc(ui.q)+'" autocomplete="off"></div>'+f+'<div id="plist"></div>';
+  return '<button type="button" class="btn rep-btn" data-action="open-report" data-by="paciente">'+ic('chart')+'Relatório de faturamento</button><div class="search">'+ic('search')+'<label for="q" class="sr">Buscar paciente</label><input id="q" type="search" placeholder="Buscar por nome, bairro ou empresa" value="'+esc(ui.q)+'" autocomplete="off"></div>'+f+'<div id="plist"></div>';
 }
 function renderPatientList(){
   const el=$('#plist');if(!el) return;
@@ -1239,7 +1239,7 @@ function renderPatientList(){
 function viewTipos(){
   const list=tiposList();
   if(!list.length) return '<div class="empty"><p>Nenhum tipo cadastrado. Crie os tipos de atendimento que você realiza, como curativo ou fisioterapia.</p><button type="button" class="btn small primary" data-action="new-tipo">Criar tipo</button></div>';
-  return '<p class="hint" style="margin:0 2px 12px">Estes tipos aparecem ao agendar um atendimento e no cadastro de pacientes recorrentes. Toque em um tipo para renomear ou excluir.</p><ul class="group">'+
+  return '<p class="hint hint-list">Estes tipos aparecem ao agendar um atendimento e no cadastro de pacientes recorrentes. Toque em um tipo para renomear ou excluir.</p><ul class="group">'+
     list.map(t=>'<li><button type="button" class="row" data-action="open-tipo" data-name="'+esc(t)+'"><span class="row-main"><span class="row-name">'+esc(t)+'</span><span class="row-sub">'+esc(tipoUso(t))+'</span></span></button></li>').join('')+'</ul>';
 }
 function viewEmpresas(){
@@ -1477,7 +1477,7 @@ function visitForm(v,opts){
 
 function tipoForm(nome){
   const edit=nome!=null;
-  const b='<form id="f-tipo" novalidate data-old="'+esc(nome||'')+'"><label for="t-nome">Nome do tipo</label><input id="t-nome" name="nome" maxlength="40" autocomplete="off" placeholder="Ex.: Troca de sonda" value="'+esc(nome||'')+'">'+
+  const b='<form id="f-tipo" novalidate data-old="'+esc(nome||'')+'"><label for="t-nome">Nome do tipo</label><input id="t-nome" name="nome" maxlength="'+LIM.tipo+'" autocomplete="off" placeholder="Ex.: Troca de sonda" value="'+esc(nome||'')+'">'+
     (edit?'<p class="hint">Ao renomear, os atendimentos e cadastros que usam este tipo passam a usar o novo nome.</p>':'')+
     '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Salvar tipo</button><button type="button" class="btn" data-action="close-sheet">Cancelar</button>'+
     (edit?askBlock('t'+tiposList().indexOf(nome),'Excluir o tipo “'+esc(nome)+'”? Atendimentos já registrados mantêm o nome.','do-delete-tipo',esc(nome)):'')+'</div></form>';
@@ -1486,8 +1486,8 @@ function tipoForm(nome){
 function linkForm(companyId){
   const c=findCompany(companyId);if(!c) return;
   const ps=S.patients.filter(p=>p.empresaId!==companyId).sort((x,y)=>x.nome.localeCompare(y.nome,'pt-BR'));
-  const b='<form id="f-link" novalidate data-company="'+c.id+'"><p class="hint" style="margin:0 0 10px">Marque os pacientes que passam a ser atendidos por <strong>'+esc(c.nome)+'</strong>. Quem já estiver em outra empresa muda para esta.</p>'+
-    (ps.length>6?'<div class="search">'+ic('search')+'<label for="lk-q" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">Buscar paciente</label><input id="lk-q" data-role="link-q" type="search" placeholder="Buscar por nome" autocomplete="off"></div>':'')+
+  const b='<form id="f-link" novalidate data-company="'+c.id+'"><p class="hint hint-form">Marque os pacientes que passam a ser atendidos por <strong>'+esc(c.nome)+'</strong>. Quem já estiver em outra empresa muda para esta.</p>'+
+    (ps.length>6?'<div class="search">'+ic('search')+'<label for="lk-q" class="sr">Buscar paciente</label><input id="lk-q" data-role="link-q" type="search" placeholder="Buscar por nome" autocomplete="off"></div>':'')+
     '<ul class="group" id="lk-list">'+ps.map(function(p){
       const atual=findCompany(p.empresaId);
       return '<li><label class="lrow" data-n="'+esc(norm(p.nome))+'"><input type="checkbox" name="pac" value="'+esc(p.id)+'" aria-label="'+esc(p.nome)+'">'+avatar(p)+'<span class="row-main"><span class="row-name">'+esc(p.nome)+exTag(p)+'</span><span class="row-sub">'+(atual?'Hoje em '+esc(atual.nome):'Particular')+'</span></span></label></li>';
@@ -1610,7 +1610,7 @@ function saveVisit(f){
 }
 
 /* ---------- ações ---------- */
-function setWeek(start,keepOffset){
+function setWeek(start){
   const off=fromIso(ui.day).getDay();
   ui.weekStart=iso(start);
   ui.day=iso(addDays(start,off));
