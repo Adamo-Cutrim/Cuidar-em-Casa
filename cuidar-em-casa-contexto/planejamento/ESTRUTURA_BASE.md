@@ -80,6 +80,8 @@ O arquivo já está dividido em blocos comentados. Este é o mapa para quem for 
 | E3 ✅ | Estilos inline (`style="..."`) em perfil, menu, rótulos de busca e dicas. | Impede CSP sem `unsafe-inline` (auditoria C). Corrigido: classes no CSS, zero `style="` no app. O `vercel.json` ainda tem `'unsafe-inline'` em `style-src`; removê-lo é um passo à parte. | `openMenu`, `openProfile`, `viewPacientes`, `linkForm`, `viewTipos` |
 | E4 ✅ | Classe utilitária `sr` usada mas não definida no CSS (o efeito vem do `style` inline). | Mesma causa de E3. | `viewPacientes` |
 | E5 ✅ | Parâmetro sem uso `keepOffset` em `setWeek`. | Só limpeza. Removido. | ações |
+| E6 | `parseMoney` trata o ponto como decimal quando não há vírgula: `"1.234"` vira 1,23 e `"1.5"` vira 1,5; o sinal de menos é descartado (`"-5"` vira 5). | Quem digita mil duzentos e trinta e quatro como `1.234` grava R$ 1,23 sem aviso. Achado pelos testes da v17 (`unit/core.test.mjs`); **não corrigido** (v17 não muda comportamento). | `core/money.js` |
+| E7 | `keepExtra` copia texto, número e booleano que o validador não tratou, então valor inválido de campo conhecido passa como "extra": `serieData: "2026-02-30"`, `ex: "sim"`, `rec: "x"`. `serieData` inválida chega a `serie_data` (app.js, pushAll) e o Postgres recusa, travando as gravações da conta. | Só com backup adulterado ou corrompido (a v16 abriu esse caminho com o restaurar). **Candidato a PR de correção próprio**, com teste. | `domain/validation.js` |
 
 ---
 
@@ -239,6 +241,7 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 
 | Data | Mudança |
 |---|---|
+| 23/11/2026 | (Claude Code) **v17 parte 1** (só reorganização, sem mudar comportamento): `app.js` vira módulo ES (`<script type="module">`) e perde 1 camada (IIFE); nascem `site/src/core/{limits,dates,text,money,ids}.js` e `site/src/domain/validation.js`, recortados sem reescrever. Testes: 44 unitários (`testes/unit`, `node --test`, conferidos por mutação) + 101 de navegador, todos passando; `testes/lint.sh` (ESLint `no-undef`) pega import esquecido. Achados E6 e E7 na seção 3.3. Próximas partes: recurrence+billing, data, ui. |
 | 23/11/2026 19:10 | (Claude Code) Deploy automático **voltou** (usuário reconectou o Git na Vercel; o merge do PR #8 gerou deploy sozinho). A correção de 18:30 abaixo vale só para o período PR #2 a #7. |
 | 23/11/2026 18:30 | (Claude Code) v16 publicada em produção por redeploy manual. **Correção:** a frase "deploy automático a cada merge na `main`" (seções 2 e histórico de 18/11) não se confirmou; ver `LEIA-ME_HANDOFF.md`. |
 | 23/11/2026 17:54 | (Claude Code) **v16 fechada** (`versoes/v16_2026-11-23_1754_site/`). Parte 3: restaurar backup JSON no Perfil (`planImport`/`applyImport` em `app.js`), com ids calculados por conta, contagem de itens ignorados/ajustados/descartados antes de confirmar, e baixar backup sem exemplos. Testes novos em `testes/t3.py` (44 verificações). Próxima etapa do roteiro: v17 (reorganizar em módulos, sem mudar comportamento). |

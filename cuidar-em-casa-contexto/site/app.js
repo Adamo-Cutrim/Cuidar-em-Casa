@@ -1,45 +1,16 @@
-
-(function(){
-'use strict';
-
+/* Cuidar em Casa: ponto de entrada. Os modulos de src/ guardam o que nao depende de tela nem de estado (v17). */
+import {SHORT,LONG,LIM} from './src/core/limits.js';
+import {pad,iso,fromIso,addDays,startOfWeek,WD,WDL,MON,nowKey,age,isoToBr,brToIso} from './src/core/dates.js';
+import {esc,norm,initials,hashN,cleanName} from './src/core/text.js';
+import {BRL,parseMoney,brl} from './src/core/money.js';
+import {uid,isUuid,hashUuid} from './src/core/ids.js';
+import {okDate,normalize} from './src/domain/validation.js';
 /* ---------- utilidades ---------- */
 const $=(s,r)=>(r||document).querySelector(s);
-const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const uid=()=>{
-  if(crypto.randomUUID) return crypto.randomUUID();
-  const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
-  const x=Array.from(b,n=>n.toString(16).padStart(2,'0')).join('');
-  return x.slice(0,8)+'-'+x.slice(8,12)+'-'+x.slice(12,16)+'-'+x.slice(16,20)+'-'+x.slice(20);
-};
-const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
-const pad=n=>String(n).padStart(2,'0');
-const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-const fromIso=s=>{const p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);};
-const addDays=(d,n)=>{const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()+n);return x;};
-const startOfWeek=d=>addDays(d,-d.getDay());
-const WD=['dom','seg','ter','qua','qui','sex','sáb'];
-const WDL=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
-const MON=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const ic=n=>'<svg class="i" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
-const nowKey=()=>{const n=new Date();return iso(n)+' '+pad(n.getHours())+':'+pad(n.getMinutes());};
 const TIPOS_EMPRESA=['Operadora de saúde','Clínica','Hospital','Empresa de home care','Particular ou outro'];
 const TIPOS_ATEND=['Consulta','Curativo','Aplicação de medicação','Fisioterapia','Coleta de exame','Avaliação'];
 
-function age(n){
-  if(!n) return null;
-  const b=fromIso(n),t=new Date();
-  let a=t.getFullYear()-b.getFullYear();
-  if(t.getMonth()<b.getMonth()||(t.getMonth()===b.getMonth()&&t.getDate()<b.getDate())) a--;
-  return a>=0&&a<130?a:null;
-}
-function parseMoney(s){
-  s=String(s||'').replace(/[^\d.,]/g,'');
-  if(!s) return null;
-  if(s.indexOf(',')>-1) s=s.replace(/\./g,'').replace(',','.');
-  const n=Number(s);
-  return isFinite(n)&&n>=0?Math.round(n*100)/100:NaN;
-}
 function weekLabel(){
   const a=fromIso(ui.weekStart),b=addDays(a,6);
   if(a.getMonth()===b.getMonth()) return a.getDate()+' a '+b.getDate()+' de '+MON[b.getMonth()];
@@ -47,17 +18,6 @@ function weekLabel(){
 }
 const dayTitle=d=>WDL[d.getDay()]+', '+d.getDate()+' de '+MON[d.getMonth()];
 
-/* ---------- campo de data: digitar (dd/mm/aaaa) ou abrir o calendário na setinha ---------- */
-const isoToBr=i=>i?String(i).split('-').reverse().join('/'):'';
-function brToIso(t){
-  const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(t).trim());
-  if(!m) return null;
-  const d=+m[1],mo=+m[2],y=+m[3];
-  if(y<1900||y>2100||mo<1||mo>12||d<1) return null;
-  const dt=new Date(y,mo-1,d);
-  if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d) return null;
-  return y+'-'+pad(mo)+'-'+pad(d);
-}
 function dateField(id,name,value,opt){
   opt=opt||{};
   return '<div class="datef"><div class="datef-row"><input id="'+id+'" name="'+name+'" type="text" data-kind="date" inputmode="numeric" autocomplete="off" placeholder="dd/mm/aaaa" maxlength="10" value="'+esc(isoToBr(value))+'">'+
@@ -202,64 +162,6 @@ function delLocal(k){try{localStorage.removeItem(k);}catch(e){}}
 function delSess(k){try{sessionStorage.removeItem(k);}catch(e){}}
 function readLocal(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function writeLocal(k,v){try{localStorage.setItem(k,v);}catch(e){}}
-/* Tudo que vem de fora (armazenamento do aparelho ou da conta) passa por aqui antes de ser usado.
-   Ids só podem ter letras, números, _ e -, porque entram em atributos HTML. Textos têm tamanho máximo. */
-const SHORT=300,LONG=5000,LIM={nome:80,tel:60,tipo:60,profissao:100,registro:60,cidade:100},ISO_D=/^\d{4}-\d{2}-\d{2}$/,HHMM=/^([01]\d|2[0-3]):[0-5]\d$/;
-const sid=v=>{const t=String(v==null?'':v).replace(/[^\w-]/g,'_').slice(0,64);return /^__/.test(t)?'i'+t:t;};
-const TXT=(v,n)=>typeof v==='string'?v.slice(0,n||SHORT):(typeof v==='number'&&isFinite(v)?String(v).slice(0,n||SHORT):'');
-const okDate=v=>typeof v==='string'&&ISO_D.test(v)&&brToIso(isoToBr(v))===v;
-const numOrNull=v=>{if(v==null||v==='') return null;const n=Number(v);return isFinite(n)&&n>=0&&n<1e9?n:null;};
-function keepExtra(src,dst){
-  Object.keys(src).forEach(function(k){
-    if(k==='__proto__'||k==='constructor'||k==='prototype'||Object.prototype.hasOwnProperty.call(dst,k)) return;
-    const v=src[k];
-    if(typeof v==='string') dst[k]=v.slice(0,LONG);
-    else if((typeof v==='number'&&isFinite(v))||typeof v==='boolean') dst[k]=v;
-  });
-}
-function uniqueIds(list){
-  const seen=new Set();
-  list.forEach(function(x){while(seen.has(x.id)) x.id=uid();seen.add(x.id);});
-  return list;
-}
-function normRec(r){
-  if(!r||typeof r!=='object') return null;
-  const dias=Array.isArray(r.dias)?Array.from(new Set(r.dias.map(Number).filter(n=>Number.isInteger(n)&&n>=0&&n<=6))):[];
-  return {ativo:r.ativo===true&&dias.length>0,dias:dias,hora:HHMM.test(r.hora)?r.hora:'08:00',tipo:TXT(r.tipo,100),inicio:okDate(r.inicio)?r.inicio:iso(new Date()),fim:okDate(r.fim)?r.fim:''};
-}
-function normPatient(p){
-  if(!p||typeof p!=='object') return null;
-  const o={id:sid(p.id)||uid(),nome:TXT(p.nome),nasc:okDate(p.nasc)?p.nasc:'',tel:TXT(p.tel,60),respNome:TXT(p.respNome),respTel:TXT(p.respTel,60),endereco:TXT(p.endereco),bairro:TXT(p.bairro),ref:TXT(p.ref,LONG),empresaId:sid(p.empresaId),valor:numOrNull(p.valor),condicoes:TXT(p.condicoes,LONG),alergias:TXT(p.alergias,LONG),medicamentos:TXT(p.medicamentos,LONG),obs:TXT(p.obs,LONG)};
-  if(p.ex===true) o.ex=true;
-  const r=normRec(p.rec);if(r) o.rec=r;
-  if(Array.isArray(p.recExc)) o.recExc=p.recExc.filter(okDate).slice(0,5000);
-  keepExtra(p,o);return o;
-}
-function normCompany(c){
-  if(!c||typeof c!=='object') return null;
-  const n=Number(c.cor);
-  const o={id:sid(c.id)||uid(),nome:TXT(c.nome),tipo:TXT(c.tipo),contato:TXT(c.contato),valorPadrao:numOrNull(c.valorPadrao),pagamento:TXT(c.pagamento),obs:TXT(c.obs,LONG),cor:Number.isInteger(n)&&n>=0&&n<1000?n:0};
-  if(c.ex===true) o.ex=true;
-  keepExtra(c,o);return o;
-}
-function normVisit(v){
-  if(!v||typeof v!=='object'||!okDate(v.date)) return null;
-  const o={id:sid(v.id)||uid(),pacienteId:sid(v.pacienteId),date:v.date,hora:HHMM.test(v.hora)?v.hora:'08:00',tipo:TXT(v.tipo,100),obs:TXT(v.obs,LONG),status:v.status==='feito'||v.status==='cancelado'?v.status:'agendado'};
-  if(v.serie) o.serie=sid(v.serie);
-  if(okDate(v.serieData)) o.serieData=v.serieData;
-  if(v.manual===true) o.manual=true;
-  if(v.ex===true) o.ex=true;
-  keepExtra(v,o);return o;
-}
-function normalize(o){
-  o=(o&&typeof o==='object')?o:{};
-  const pf=(o.perfil&&typeof o.perfil==='object')?o.perfil:{};
-  let tipos;
-  if(Array.isArray(o.tipos)) tipos=Array.from(new Set(o.tipos.filter(x=>typeof x==='string').map(x=>x.trim().replace(/\s+/g,' ').slice(0,LIM.tipo)).filter(Boolean))).slice(0,200);
-  const arr=a=>Array.isArray(a)?a:[];
-  return {patients:uniqueIds(arr(o.patients).map(normPatient).filter(Boolean)),companies:uniqueIds(arr(o.companies).map(normCompany).filter(Boolean)),visits:uniqueIds(arr(o.visits).map(normVisit).filter(Boolean)),
-    rev:Math.max(0,Math.floor(Number(o.rev))||0),perfil:{nome:TXT(pf.nome,LIM.nome),tel:TXT(pf.tel,LIM.tel),profissao:TXT(pf.profissao,LIM.profissao),registro:TXT(pf.registro,LIM.registro),cidade:TXT(pf.cidade,LIM.cidade)},tipos:tipos,persisted:true};
-}
 function makeDemo(){
   const comps=[
     {id:'ex-c1',nome:'Vida Plena Saúde',tipo:'Operadora de saúde',contato:'Marcos, (00) 3000-0101',valorPadrao:180,pagamento:'Pagamento até o dia 10',obs:'',cor:0,ex:true},
@@ -417,24 +319,6 @@ function readHashSession(){
   return {access_token:p.get('access_token'),refresh_token:p.get('refresh_token')||'',expires_in:p.get('expires_in'),expires_at:p.get('expires_at'),type:p.get('type')};
 }
 
-/* ---------- dados: carregar do banco e gravar só o que mudou ----------
-   Esquema normalizado (backend/BACKEND.md §9): uma tabela por entidade, ids uuid e colunas próprias.
-   O estado S continua no formato da v14; este bloco traduz S para as linhas do banco e de volta.
-   Dados de exemplo (ex:true) nunca vão para o banco (ESTRUTURA_BASE §7, regra 9). */
-const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const isUuid=s=>typeof s==='string'&&UUID_RE.test(s);
-/* Id que não é uuid (ex.: ocorrência recorrente que virou registro, "r-{paciente}-{data}") ganha um uuid fixo,
-   calculado do id e do usuário: é sempre a mesma linha no banco e não colide com a de outro usuário. */
-function hashUuid(s){
-  const h=[0x811c9dc5,0x01000193,0x9e3779b9,0x85ebca6b];
-  for(let i=0;i<s.length;i++){
-    const c=s.charCodeAt(i);
-    for(let k=0;k<4;k++) h[k]=Math.imul(h[k]^c,0x01000193+0x2000*k)>>>0;
-  }
-  for(let k=0;k<4;k++){let x=h[k]^h[(k+1)%4];x=Math.imul(x^(x>>>16),0x85ebca6b);x=Math.imul(x^(x>>>13),0xc2b2ae35);h[k]=(x^(x>>>16))>>>0;}
-  const x=h.map(n=>n.toString(16).padStart(8,'0')).join('');
-  return x.slice(0,8)+'-'+x.slice(8,12)+'-5'+x.slice(13,16)+'-'+(8|(parseInt(x.charAt(16),16)&3)).toString(16)+x.slice(17,20)+'-'+x.slice(20,32);
-}
 const dbId=id=>isUuid(id)?id:hashUuid(ses.user.id+'|'+id);
 const tipoKey=n=>String(n).trim().toLowerCase();
 const dbTime=h=>typeof h==='string'?h.slice(0,5):'';
@@ -759,7 +643,6 @@ function readBackupFile(file){
    Cancelados não entram. Atendimentos recorrentes ainda não registrados contam como agendados. */
 let dlRef={save:function(o){dlFile(o.filename,o.data,'text/csv');return Promise.resolve();}};
 const pl=(n,a,b)=>n+' '+(n===1?a:b);
-const brl=v=>BRL.format(Number(v)||0);
 const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
 function monthRange(y,m){const a=new Date(y,m,1),b=new Date(y,m+1,0);return {y:a.getFullYear(),m:a.getMonth(),from:iso(a),to:iso(b)};}
 function repInit(o){
@@ -1109,11 +992,6 @@ function chip(compId){
   const c=findCompany(compId);
   return c?'<span class="chip c'+(c.cor%6)+'">'+esc(c.nome)+'</span>':'<span class="chip none">Particular</span>';
 }
-function initials(n){
-  const w=String(n||'?').trim().split(/\s+/).filter(Boolean);
-  return ((w[0]||'?').charAt(0)+(w.length>1?w[w.length-1].charAt(0):'')).toUpperCase();
-}
-function hashN(s){let h=0;for(const ch of String(s)) h=(h*31+ch.charCodeAt(0))>>>0;return h;}
 function avatar(p,cls){
   const c=findCompany(p.empresaId);
   const k=c?c.cor%6:hashN(p.id)%6;
@@ -1128,7 +1006,6 @@ function tiposList(){
   const l=Array.isArray(S.tipos)?S.tipos.slice():Array.from(new Set(TIPOS_ATEND.concat(S.visits.map(x=>x.tipo).filter(Boolean),S.patients.map(p=>p.rec&&p.rec.tipo).filter(Boolean))));
   return l.sort((a,b)=>a.localeCompare(b,'pt-BR'));
 }
-const cleanName=n=>String(n||'').trim().replace(/\s+/g,' ');
 function ensureTipos(){if(!Array.isArray(S.tipos)) S.tipos=tiposList();}
 function addTipo(nome){
   nome=cleanName(nome);
@@ -1950,4 +1827,3 @@ document.addEventListener('keydown',function(e){
 
 /* ---------- início ---------- */
 boot();
-})();
