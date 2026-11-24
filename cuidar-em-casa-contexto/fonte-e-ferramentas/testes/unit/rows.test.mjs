@@ -21,7 +21,7 @@ function estado() {
       {id: 'ex2', nome: 'Paciente Exemplo', ex: true, empresaId: 'ex1', valor: 10},
       {id: 'p-curto', nome: 'Ana', empresaId: '', valor: 80, rec: {ativo: false, dias: [], hora: '08:00', tipo: '', inicio: '2026-01-01', fim: '2026-12-31'}}],
     visits: [
-      {id: U(21), pacienteId: U(11), date: '2026-11-10', hora: '08:30', tipo: 'Curativo', obs: 'n', status: 'feito'},
+      {id: U(21), pacienteId: U(11), date: '2026-11-10', hora: '08:30', tipo: 'Curativo', obs: 'n', status: 'feito', valorSnapshot: 150},
       {id: 'r-' + U(11) + '-2026-11-23', pacienteId: U(11), date: '2026-11-23', hora: '09:00', tipo: 'Curativo', obs: '', status: 'agendado', serie: U(11), serieData: '2026-11-23'},
       {id: U(23), pacienteId: U(11), date: '2026-11-24', hora: '10:00', tipo: '', obs: '', status: 'agendado', serie: U(12), serieData: '2026-11-24', manual: true},   // serie de OUTRO paciente: nao vira serie_data
       {id: 'v-virtual', pacienteId: U(11), date: '2026-11-25', hora: '09:00', tipo: '', obs: '', status: 'agendado', virtual: true},
@@ -102,7 +102,7 @@ test('desiredRows: recorrencia e excecoes', () => {
 
 test('desiredRows: atendimento (serie_data so quando a serie e do proprio paciente)', () => {
   const D = desiredRows(estado(), USER, new Map());
-  assert.deepEqual(D.visits.get(U(21)), {id: U(21), user_id: USER, patient_id: U(11), data: '2026-11-10', hora: '08:30', tipo: 'Curativo', obs: 'n', status: 'feito', serie_data: null, manual: false});
+  assert.deepEqual(D.visits.get(U(21)), {id: U(21), user_id: USER, patient_id: U(11), data: '2026-11-10', hora: '08:30', tipo: 'Curativo', obs: 'n', status: 'feito', serie_data: null, manual: false, valor_snapshot: 150});
   const idMat = dbId(USER, 'r-' + U(11) + '-2026-11-23');
   assert.equal(idMat, hashUuid(USER + '|r-' + U(11) + '-2026-11-23'));
   assert.equal(D.visits.get(idMat).serie_data, '2026-11-23'); assert.equal(D.visits.get(idMat).patient_id, U(11));
@@ -146,8 +146,8 @@ const resposta = () => ({
     {id: U(11), company_id: U(1), nome: 'Maria', nasc: '1944-03-12', tel: '1', resp_nome: 'F', resp_tel: '2', endereco: 'R', bairro: 'C', ref: 'r', valor: 150, condicoes: 'c', alergias: 'a', medicamentos: 'm', obs: 'x'},
     {id: U(12), company_id: null, nome: 'Joao', nasc: null, tel: '', resp_nome: '', resp_tel: '', endereco: '', bairro: '', ref: '', valor: null, condicoes: '', alergias: '', medicamentos: '', obs: ''}],
   visits: [
-    {id: U(21), patient_id: U(11), data: '2026-11-10', hora: '08:30:00', tipo: 'Curativo', obs: '', status: 'feito', serie_data: null, manual: false},
-    {id: U(22), patient_id: U(11), data: '2026-11-23', hora: '09:00:00', tipo: '', obs: '', status: 'agendado', serie_data: '2026-11-23', manual: true}],
+    {id: U(21), patient_id: U(11), data: '2026-11-10', hora: '08:30:00', tipo: 'Curativo', obs: '', status: 'feito', serie_data: null, manual: false, valor_snapshot: 150},
+    {id: U(22), patient_id: U(11), data: '2026-11-23', hora: '09:00:00', tipo: '', obs: '', status: 'agendado', serie_data: '2026-11-23', manual: true, valor_snapshot: null}],
   recurrences: [{patient_id: U(11), ativo: true, dias: [1, 3], hora: '09:00:00', tipo: 'Curativo', inicio: '2026-11-01', fim: null}],
   exceptions: [{patient_id: U(11), data: '2026-11-11'}, {patient_id: U(11), data: '2026-11-18'}],
   serviceTypes: [{id: 't1', nome: 'Curativo'}, {id: 't2', nome: 'Fisio'}],
@@ -162,7 +162,7 @@ test('rowsToRaw: converte as linhas do banco para o formato do app', () => {
   assert.deepEqual(maria.recExc, ['2026-11-11', '2026-11-18']);
   assert.deepEqual([joao.empresaId, joao.nasc, joao.valor, 'rec' in joao, 'recExc' in joao], ['', '', null, false, false]);
   const [v1, v2] = raw.visits;
-  assert.deepEqual(v1, {id: U(21), pacienteId: U(11), date: '2026-11-10', hora: '08:30', tipo: 'Curativo', obs: '', status: 'feito'});
+  assert.deepEqual(v1, {id: U(21), pacienteId: U(11), date: '2026-11-10', hora: '08:30', tipo: 'Curativo', obs: '', status: 'feito', valorSnapshot: 150});
   assert.deepEqual(v2, {id: U(22), pacienteId: U(11), date: '2026-11-23', hora: '09:00', tipo: '', obs: '', status: 'agendado', serie: U(11), serieData: '2026-11-23', manual: true});
   assert.deepEqual(raw.tipos, ['Curativo', 'Fisio']); assert.equal(raw.rev, 0);
   assert.deepEqual(raw.perfil, {nome: 'Dra. Bia', tel: '1', profissao: 'E', registro: 'R', cidade: 'SP'});
@@ -207,6 +207,7 @@ test('ida e volta: o que o app grava e o que ele carrega de volta e igual (200 e
     const visits = Array.from({length: int(0, 12)}, (_, i) => {
       const p = pick(patients), d = dia(), v = {id: U(300 + i), pacienteId: p.id, date: d, hora: pick(['08:00', '14:15']), tipo: pick(['', 'Curativo']), obs: pick(['', 'n']), status: pick(['agendado', 'feito', 'cancelado'])};
       if (r() < 0.4) { v.serie = p.id; v.serieData = d; } if (r() < 0.3) v.manual = true;
+      if (v.status === 'feito') v.valorSnapshot = pick([null, 0, 80.5, 150]);
       return v;
     });
     const tipos = r() < 0.6 ? Array.from(new Set(Array.from({length: int(0, 4)}, () => pick(['Curativo', 'Fisio', 'Consulta', 'Coleta'])))) : undefined;
@@ -219,4 +220,25 @@ test('ida e volta: o que o app grava e o que ele carrega de volta e igual (200 e
     const norm = s => JSON.stringify({c: porId(s.companies), p: porId(s.patients).map(p => p.recExc ? {...p, recExc: p.recExc.slice().sort()} : p), v: porId(s.visits), t: s.tipos && s.tipos.length ? s.tipos : undefined});
     assert.equal(norm(volta), norm(original), 'estado ' + it);
   }
+});
+
+test('v18a: valor_snapshot na linha: so atendimento feito carrega valor; sem valor guardado vai null', () => {
+  const st = estado();
+  st.visits.push({id: U(31), pacienteId: U(11), date: '2026-11-12', hora: '08:00', tipo: '', obs: '', status: 'feito', valorSnapshot: null});
+  st.visits.push({id: U(32), pacienteId: U(11), date: '2026-11-13', hora: '08:00', tipo: '', obs: '', status: 'feito'});                                  // dado antigo, sem o campo
+  st.visits.push({id: U(33), pacienteId: U(11), date: '2026-11-14', hora: '08:00', tipo: '', obs: '', status: 'agendado', valorSnapshot: 77});          // nao deveria existir: nunca vai ao banco
+  st.visits.push({id: U(34), pacienteId: U(11), date: '2026-11-15', hora: '08:00', tipo: '', obs: '', status: 'feito', valorSnapshot: 0});
+  const D = desiredRows(st, USER, new Map());
+  assert.equal(D.visits.get(U(21)).valor_snapshot, 150); assert.equal(D.visits.get(U(31)).valor_snapshot, null); assert.equal(D.visits.get(U(32)).valor_snapshot, null);
+  assert.equal(D.visits.get(U(33)).valor_snapshot, null); assert.equal(D.visits.get(U(34)).valor_snapshot, 0);
+  assert.ok([...D.visits.values()].every(r => 'valor_snapshot' in r));          // todas as linhas com as mesmas colunas (exigencia do envio em lote)
+});
+
+test('v18a: rowsToRaw: valor_snapshot so volta para atendimento feito; numerico vira numero', () => {
+  const t = resposta();
+  t.visits.push({id: U(35), patient_id: U(11), data: '2026-11-16', hora: '08:00:00', tipo: '', obs: '', status: 'feito', serie_data: null, manual: false, valor_snapshot: '80.50'});
+  t.visits.push({id: U(36), patient_id: U(11), data: '2026-11-17', hora: '08:00:00', tipo: '', obs: '', status: 'feito', serie_data: null, manual: false, valor_snapshot: null});
+  const vs = Object.fromEntries(rowsToRaw(t).raw.visits.map(v => [v.id, v]));
+  assert.strictEqual(vs[U(35)].valorSnapshot, 80.5); assert.strictEqual(vs[U(36)].valorSnapshot, null); assert.ok('valorSnapshot' in vs[U(36)]);
+  assert.equal('valorSnapshot' in vs[U(22)], false);                             // agendado: sem o campo
 });

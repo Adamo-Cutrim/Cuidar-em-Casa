@@ -290,6 +290,7 @@ Ordem sugerida: v15 (backup + fontes locais) → organizar em arquivos + reposit
 | 20261118172825 | `esquema_normalizado` | Esquema normalizado desta seção (com trava que aborta se as tabelas antigas tivessem dados) |
 | 20261118172908 | `indice_recurrences_user_patient` | Índice apontado pelo advisor de performance |
 | 20261118195029 | `remove_site_stage` | Apagou a tabela `site_stage` depois do deploy na Vercel (decisão do usuário). SQL em `backend/sql/2026-11-18_remove_site_stage.sql`. |
+| 20261124154036 | `valor_snapshot_em_visits` | v18a: coluna `visits.valor_snapshot numeric(11,2)` (nulo permitido, faixa 0 a menos de 1 bilhão); atendimentos já feitos receberam o valor atual do paciente (no momento da migração não havia nenhum atendimento). SQL em `backend/sql/2026-11-24_valor_snapshot.sql`. **Aplicar antes de publicar o app da v18a.** |
 
 O SQL das migrações de 18/11 está guardado em `backend/sql/2026-11-18_migracoes_aplicadas.sql` (registro; não rodar de novo no mesmo banco).
 
@@ -304,7 +305,7 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 | `profiles` | `user_id` (PK, FK `auth.users`), `nome`, `tel`, `profissao`, `registro`, `cidade`, `iniciado`, `updated_at` | Tamanhos máximos (80/60/100/60/100). Criada em 17/11; só perdeu a coluna `tipos`. O e-mail vem do Auth. |
 | `companies` | `id`, `nome`, `tipo`, `contato`, `valor_padrao numeric(11,2)`, `pagamento`, `obs`, `cor smallint`, `created_at`, `updated_at` | `nome` 1 a 300; textos até 300/5.000; `valor_padrao >= 0`; `cor` 0 a 999; `unique (user_id, id)` |
 | `patients` | `id`, `company_id`, `nome`, `nasc date`, `tel`, `resp_nome`, `resp_tel`, `endereco`, `bairro`, `ref`, `valor numeric(11,2)`, `condicoes`, `alergias`, `medicamentos`, `obs`, timestamps | `nome` 1 a 300 (sem só espaços); `nasc` entre 1900 e 2100; `valor >= 0`; limites 60/300/5.000 por campo; `unique (user_id, id)` |
-| `visits` | `id`, `patient_id`, `data date`, `hora time`, `tipo`, `obs`, `status`, `serie_data date`, `manual boolean`, timestamps | `status` em (agendado, feito, cancelado); `hora` só com minutos (sem segundos); `data` entre 1900 e 2100; `tipo` até 100 (texto livre); `unique (user_id, id)` |
+| `visits` | `id`, `patient_id`, `data date`, `hora time`, `tipo`, `obs`, `status`, `serie_data date`, `manual boolean`, `valor_snapshot numeric(11,2)`, timestamps | `status` em (agendado, feito, cancelado); `hora` só com minutos (sem segundos); `data` entre 1900 e 2100; `tipo` até 100 (texto livre); `unique (user_id, id)` |
 | `recurrences` | `patient_id` (PK), `ativo`, `dias smallint[]`, `hora`, `tipo`, `inicio`, `fim`, timestamps | uma regra por paciente; `dias` só de 0 a 6; se `ativo`, precisa de pelo menos 1 dia; `fim >= inicio` |
 | `recurrence_exceptions` | PK `(patient_id, data)`, `created_at` | ocorrências excluídas de uma recorrência |
 | `service_types` | `id`, `nome`, `created_at` | `nome` 1 a 60; único por usuário sem diferenciar maiúsculas/espaços nas pontas |
@@ -346,7 +347,7 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 | `patients[].rec` | `recurrences` (1 linha por paciente; `fim` vazio vira `null`) |
 | `patients[].recExc` | `recurrence_exceptions` (1 linha por data) |
 | `companies[]`: `nome`, `tipo`, `contato`, `valorPadrao`, `pagamento`, `obs`, `cor` | `companies`: `nome`, `tipo`, `contato`, `valor_padrao`, `pagamento`, `obs`, `cor` |
-| `visits[]`: `pacienteId`, `date`, `hora`, `tipo`, `obs`, `status`, `manual` | `visits`: `patient_id`, `data`, `hora`, `tipo`, `obs`, `status`, `manual` |
+| `visits[]`: `pacienteId`, `date`, `hora`, `tipo`, `obs`, `status`, `manual`, `valorSnapshot` | `visits`: `patient_id`, `data`, `hora`, `tipo`, `obs`, `status`, `manual`, `valor_snapshot` |
 | `visits[].serie` + `serieData` | `visits.serie_data` (a série é o próprio `patient_id`) |
 | `S.tipos` | `service_types` (1 linha por tipo) |
 | `S.perfil` + nome da conta | `profiles` (`tel`, `profissao`, `registro`, `cidade`, `nome`) |
@@ -373,7 +374,7 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 
 ## 11. Pontos em aberto (decidir antes de implementar)
 
-1. ~~Valor no histórico~~ **Decidido em 24/11/2026:** guardar o valor do atendimento **no momento em que ele é marcado como feito** (`visits.valor_snapshot`). Regras propostas, a confirmar na implementação: ao marcar como feito, grava o valor atual do paciente; ao voltar para agendado ou cancelado, limpa; atendimentos já feitos recebem, na migração, o valor atual do paciente (preserva os relatórios de hoje); valor vazio no momento de marcar fica como "sem valor" e não é preenchido depois, para o relatório não mudar sozinho; Previsto (agendado) continua usando o valor atual.
+1. ~~Valor no histórico~~ **Decidido e implementado (v18a) em 24/11/2026:** guardar o valor do atendimento **no momento em que ele é marcado como feito** (`visits.valor_snapshot`). Regras propostas, a confirmar na implementação: ao marcar como feito, grava o valor atual do paciente; ao voltar para agendado ou cancelado, limpa; atendimentos já feitos recebem, na migração, o valor atual do paciente (preserva os relatórios de hoje); valor vazio no momento de marcar fica como "sem valor" e não é preenchido depois, para o relatório não mudar sozinho; Previsto (agendado) continua usando o valor atual. **Implementação:** `domain/visit.js` (`setStatus`, `snapshotValue`); feito sem o campo (dado antigo) usa o valor atual do paciente; trocar o paciente de um atendimento feito refaz o valor com o do novo paciente; restaurar um backup antigo preenche com o valor do paciente. No relatório CSV a coluna "Valor por atendimento" virou "Valor atual por atendimento" (cada atendimento feito pode ter valor diferente). **Risco de publicação:** um app antigo ainda aberto, ao marcar um atendimento como feito, não envia o valor; o atendimento fica "sem valor" no relatório. Mitigação possível se houver mais usuários: gatilho no banco que preencha o valor quando um atendimento vira "feito" sem valor guardado.
 2. **Onde expandir recorrências:** no cliente (como hoje, consultando por mês) ou em função do servidor? Impacta a consulta por mês e os relatórios de faturamento.
 3. ~~Tipo de atendimento~~ **Decidido em 24/11/2026:** **ligado à lista de tipos** (`visits.service_type_id` apontando para `service_types`), com cadastro de novos tipos pelo app (a tela de tipos e o "criar novo tipo" já existem; passam a gravar a ligação). Migração: casar o texto atual de cada atendimento com o nome do tipo (sem diferenciar maiúsculas e espaços) e criar os tipos que faltarem. Renomear um tipo passa a ser uma atualização única.
 4. **Quem é o controlador dos dados** (profissional ou empresa/clínica) e se algum dia haverá compartilhamento de pacientes entre profissionais. Hoje o modelo é um usuário = seus próprios dados (`user_id`).

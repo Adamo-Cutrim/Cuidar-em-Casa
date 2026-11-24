@@ -125,7 +125,7 @@ test('repCsv por paciente: BOM, separador ;, CRLF, cabecalho e totais', () => {
   assert.equal(t[0], '\ufeff');
   const L = t.slice(1).split('\r\n');
   assert.deepEqual(L.slice(0, 7), ['Relatório de faturamento', 'Período;01/11/2026 a 30/11/2026', 'Agrupado por;Paciente', 'Empresa;Todas', 'Paciente;Todos', 'Gerado em;23/11/2026 12:00', '']);
-  assert.equal(L[7], 'Paciente;Empresa;Atendimentos feitos;Valor por atendimento;Valor realizado;Atendimentos agendados;Valor previsto');
+  assert.equal(L[7], 'Paciente;Empresa;Atendimentos feitos;Valor atual por atendimento;Valor realizado;Atendimentos agendados;Valor previsto');
   assert.deepEqual(L.slice(8), [
     'Ana;Clinica Alfa;2;100,00;200,00;2;200,00', 'Bruno;Zeta Saude;1;200,00;200,00;0;0,00', 'Carla;Particular;1;150,00;150,00;4;600,00',
     'Dani;Clinica Alfa;1;;0,00;1;0,00', 'Edu;Particular;1;50,00;50,00;0;0,00', 'Total;;6;;600,00;7;800,00']);
@@ -166,4 +166,49 @@ test('repText: resumo para copiar', () => {
 
 test('pl: singular so quando e exatamente 1', () => {
   assert.equal(pl(1, 'feito', 'feitos'), '1 feito'); assert.equal(pl(0, 'feito', 'feitos'), '0 feitos'); assert.equal(pl(2, 'feito', 'feitos'), '2 feitos');
+});
+
+// ---- v18a: o valor de um atendimento feito e o que foi guardado ao marcar como feito ----
+const cen = (ajusta) => { const c = cenario(); ajusta(c); return c; };
+const feitosDe = (c, nome, rep = REP()) => repData(c, rep, AGORA).rows.find(r => r.nome === nome);
+
+test('v18a: mudar o valor do paciente depois NAO altera o que ja foi realizado', () => {
+  const c = cen(c => { c.visits.find(v => v.id === 'v1').valorSnapshot = 100; c.visits.find(v => v.id === 'v2').valorSnapshot = 100; c.patients.find(p => p.id === 'p1').valor = 999; });
+  const ana = feitosDe(c, 'Ana');
+  assert.equal(ana.real, 200);                 // dois feitos de R$ 100 guardados; o valor atual (999) so vale para o Previsto
+  assert.equal(ana.prev, 1998);                // dois agendados a 999
+});
+
+test('v18a: cada atendimento feito usa o seu proprio valor guardado', () => {
+  const c = cen(c => { c.visits.find(v => v.id === 'v1').valorSnapshot = 100; c.visits.find(v => v.id === 'v2').valorSnapshot = 130; });
+  assert.equal(feitosDe(c, 'Ana').real, 230);
+});
+
+test('v18a: valor guardado null = "sem valor": soma 0 e entra no aviso', () => {
+  const c = cen(c => { c.visits.find(v => v.id === 'v1').valorSnapshot = null; c.visits.find(v => v.id === 'v2').valorSnapshot = 100; });
+  const d = repData(c, REP({pac: 'p1'}), AGORA);
+  assert.equal(d.rows[0].real, 100); assert.equal(d.semValor, 1);
+});
+
+test('v18a: valor guardado 0 e um valor (nao entra no aviso de "sem valor")', () => {
+  const c = cen(c => { c.visits.find(v => v.id === 'v1').valorSnapshot = 0; c.visits.find(v => v.id === 'v2').valorSnapshot = 0; });
+  const d = repData(c, REP({pac: 'p1'}), AGORA); assert.equal(d.rows[0].real, 0); assert.equal(d.semValor, 0);
+});
+
+test('v18a: feito SEM o campo (dado antigo) usa o valor atual do paciente, como antes', () => {
+  assert.equal(feitosDe(cenario(), 'Ana').real, 200);
+  const c = cen(c => { c.patients.find(p => p.id === 'p1').valor = 120; });
+  assert.equal(feitosDe(c, 'Ana').real, 240);
+});
+
+test('v18a: agendado e virtual usam sempre o valor atual (so o feito e congelado)', () => {
+  const c = cen(c => { c.visits.find(v => v.id === 'v3').valorSnapshot = 5; c.patients.find(p => p.id === 'p3').valor = 300; });   // campo estranho num agendado: ignorado
+  assert.equal(feitosDe(c, 'Ana').prev, 100 + 100);
+  assert.equal(feitosDe(c, 'Carla').prev, 4 * 300);
+});
+
+test('v18a: o relatorio por empresa tambem soma os valores guardados', () => {
+  const c = cen(c => { c.visits.find(v => v.id === 'v1').valorSnapshot = 100; c.visits.find(v => v.id === 'v2').valorSnapshot = 100; c.visits.find(v => v.id === 'v7').valorSnapshot = 70; });
+  const d = repData(c, REP({by: 'empresa', emp: 'c1'}), AGORA);
+  assert.equal(d.rows[0].real, 270); assert.equal(d.tot.real, 270);
 });

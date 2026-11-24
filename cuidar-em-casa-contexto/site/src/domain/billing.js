@@ -21,7 +21,9 @@ export function repData(state,r,now=nowKey()){
     const comp=noCompany(state,p)?null:findCompany(state,p.empresaId);
     const key=r.by==='empresa'?(comp?comp.id:'none'):p.id;
     const row=rows[key]||(rows[key]={key:key,nome:r.by==='empresa'?(comp?comp.nome:'Particulares'):p.nome,empresa:comp?comp.nome:'Particular',valor:(p.valor==null||p.valor==='')?null:pValue(p),feitos:0,ag:0,real:0,prev:0,pacs:Object.create(null)});
-    const val=pValue(p),sem=(p.valor==null||p.valor==='');
+    /* feito com valor guardado (v18a): vale o que foi guardado ao marcar como feito; null = sem valor. Sem o campo (dado antigo) e agendado: valor atual do paciente. */
+    const guardado=v.status==='feito'&&Object.prototype.hasOwnProperty.call(v,'valorSnapshot');
+    const val=guardado?(v.valorSnapshot==null?0:Number(v.valorSnapshot)):pValue(p),sem=guardado?v.valorSnapshot==null:(p.valor==null||p.valor==='');
     if(sem) semValor++;
     row.pacs[p.id]=1;tot.pacs[p.id]=1;
     if(v.status==='feito'){row.feitos++;row.real+=val;tot.feitos++;tot.real+=val;}
@@ -51,7 +53,7 @@ export function repCsv(state,r,now=new Date()){
     d.rows.forEach(x=>L.push([x.nome,Object.keys(x.pacs).length,x.feitos,csvNum(x.real),x.ag,csvNum(x.prev)]));
     L.push(['Total',Object.keys(d.tot.pacs).length,d.tot.feitos,csvNum(d.tot.real),d.tot.ag,csvNum(d.tot.prev)]);
   }else{
-    L.push(['Paciente','Empresa','Atendimentos feitos','Valor por atendimento','Valor realizado','Atendimentos agendados','Valor previsto']);
+    L.push(['Paciente','Empresa','Atendimentos feitos','Valor atual por atendimento','Valor realizado','Atendimentos agendados','Valor previsto']);
     d.rows.forEach(x=>L.push([x.nome,x.empresa,x.feitos,x.valor==null?'':csvNum(x.valor),csvNum(x.real),x.ag,csvNum(x.prev)]));
     L.push(['Total','',d.tot.feitos,'',csvNum(d.tot.real),d.tot.ag,csvNum(d.tot.prev)]);
   }
