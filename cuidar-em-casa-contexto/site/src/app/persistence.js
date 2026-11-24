@@ -48,7 +48,7 @@ export async function loadAll(){
     api('/rest/v1/profiles?select=nome,tel,profissao,registro,cidade,iniciado&limit=1'),
     fetchAll('companies','id,nome,tipo,contato,valor_padrao,pagamento,obs,cor','id'),
     fetchAll('patients','id,company_id,nome,nasc,tel,resp_nome,resp_tel,endereco,bairro,ref,valor,condicoes,alergias,medicamentos,obs','id'),
-    fetchAll('visits','id,patient_id,data,hora,tipo,obs,status,serie_data,manual','data,id'),
+    fetchAll('visits','id,patient_id,data,hora,tipo,obs,status,serie_data,manual,valor_snapshot','data,id'),
     fetchAll('recurrences','patient_id,ativo,dias,hora,tipo,inicio,fim','patient_id'),
     fetchAll('recurrence_exceptions','patient_id,data','patient_id,data'),
     fetchAll('service_types','id,nome','created_at,id')
