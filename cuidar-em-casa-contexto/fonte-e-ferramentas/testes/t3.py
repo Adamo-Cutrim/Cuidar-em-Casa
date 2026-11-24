@@ -123,4 +123,29 @@ with sync_playwright() as p:
     chk('mesmo arquivo de novo na conta do Davi nao duplica', (p2.reload(), p2.wait_for_selector('#gate', state='hidden', timeout=8000), open_perfil(p2), pick(p2, path), 'Nada novo neste arquivo' in sheet(p2))[-1])
     chk('nenhum erro do banco no fim', db_errors() == [], db_errors())
 
+    print('H) backup adulterado (E7): data de serie que nao existe nao trava mais a conta')
+    E_E7 = 'backup.e7@teste.com'; mock('/__mock/clearlog')
+    ruim = {'app': 'cuidar-em-casa', 'versao': 1, 'exportadoEm': '2026-11-20T10:00:00.000Z', 'empresas': [],
+            'pacientes': [{'id': U(41), 'nome': 'Paciente E7', 'valor': 150, 'ex': 'sim', 'rec': 'x'}],
+            'atendimentos': [{'id': U(42), 'pacienteId': U(41), 'date': '2026-11-10', 'hora': '08:00', 'status': 'agendado', 'serie': U(41), 'serieData': '2026-02-30', 'virtual': True}]}
+    c3 = b.new_context(viewport={'width': 390, 'height': 844}); p3 = newpage(c3)
+    create_account(p3, 'E7', E_E7, PW); open_perfil(p3); pick(p3, wfile('adulterado.json', json.dumps(ruim)))
+    tem = p3.locator('[data-action="import-confirm"]').count() > 0
+    chk('resumo oferece restaurar (paciente com ex:"sim" nao e descartado como exemplo)', tem, sheet(p3).replace('\n', ' | ')[:120])
+    if not tem: p3.locator('.sheet [data-action="close-sheet"]').first.click(); p3.wait_for_timeout(300)
+    else: p3.locator('[data-action="import-confirm"]').click()
+    chk('salvou (sem "servidor recusou")', saved(p3), p3.locator('#foot').inner_text())
+    chk('paciente e atendimento no banco', len(rows('patients', E_E7)) == 1 and len(rows('visits', E_E7)) == 1, (len(rows('patients', E_E7)), len(rows('visits', E_E7))))
+    vs = rows('visits', E_E7); chk('atendimento gravado sem a data de serie invalida', len(vs) == 1 and vs[0]['serie_data'] is None, vs)
+    chk('nenhum erro do banco', db_errors() == [], db_errors())
+    p3.locator('[data-action="tab"][data-tab="empresas"]').click(); p3.wait_for_timeout(250); p3.locator('#fab').click(); p3.wait_for_selector('#f-company')
+    p3.fill('#f-company [name=nome]', 'Empresa E7'); p3.locator('#f-company button[type=submit]').click(); saved(p3)
+    p3.locator('[data-action="open-company"]').first.click(); p3.wait_for_selector('.sheet [data-action="ask"]')
+    p3.locator('.sheet [data-action="ask"]').click(); p3.locator('.sheet .confirm:not([hidden]) .btn.danger').click(); saved(p3)
+    chk('exclusao chega ao banco', not any(r['nome'] == 'Empresa E7' for r in rows('companies', E_E7)))
+    p3.reload(); p3.wait_for_selector('#gate', state='hidden', timeout=8000); p3.wait_for_timeout(400)
+    p3.locator('[data-action="tab"][data-tab="empresas"]').click(); p3.wait_for_timeout(250)
+    chk('empresa excluida nao volta ao recarregar', 'Empresa E7' not in p3.locator('#view').inner_text())
+    chk('paciente do arquivo nao virou "exemplo" (ex:"sim" ignorado)', any(r['nome'] == 'Paciente E7' for r in rows('patients', E_E7)))
+
     print('\nresultado: %d ok, %d falhas | erros JS/console: %s' % (ok[0], ok[1], errs)); b.close()

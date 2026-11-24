@@ -59,11 +59,9 @@ test('normPatient: ex===true marca como exemplo; objeto nao passa', () => {
   assert.equal('ex' in normPatient({ex: {}}), false); assert.equal('ex' in normPatient({}), false);
 });
 
-test('QUIRK registrado (v17 nao muda comportamento): ex com valor que nao e true passa como "campo extra" e continua verdadeiro', () => {
-  // keepExtra copia texto, numero e booleano que o validador nao tratou. O app testa "x.ex" por veracidade,
-  // entao ex:"sim" ou ex:1 vindos de um arquivo contam como exemplo. Candidato a correcao em PR proprio.
-  assert.equal(normPatient({ex: 'true'}).ex, 'true'); assert.equal(normPatient({ex: 1}).ex, 1);
-  assert.equal(normPatient({ex: 'sim'}).ex, 'sim'); assert.equal(normPatient({ex: false}).ex, false);
+test('E7 corrigido: ex que nao e true nao passa como "campo extra" (antes ex:"sim" ou ex:1 virava exemplo)', () => {
+  for (const v of ['true', 1, 'sim', false, 0]) assert.equal('ex' in normPatient({ex: v}), false, JSON.stringify(v));
+  for (const v of ['true', 1]) { assert.equal('ex' in normCompany({ex: v}), false); assert.equal('ex' in normVisit({date: '2026-11-23', ex: v}), false); }
 });
 
 test('normPatient: recorrencia e excecoes', () => {
@@ -76,9 +74,8 @@ test('normPatient: recorrencia e excecoes', () => {
   assert.deepEqual(normPatient({recExc: [1]}).recExc, []);
 });
 
-test('QUIRK registrado: rec e recExc que nao sao objeto/lista passam como texto ou numero (o app so le .ativo e indexOf, entao nao quebra)', () => {
-  assert.equal(normPatient({rec: 'x'}).rec, 'x'); assert.equal(normPatient({rec: 5}).rec, 5);
-  assert.equal(normPatient({recExc: 'x'}).recExc, 'x'); assert.equal(normPatient({recExc: 5}).recExc, 5);
+test('E7 corrigido: rec e recExc que nao sao objeto/lista sao descartados (antes passavam como texto ou numero)', () => {
+  for (const v of ['x', 5, true]) { assert.equal('rec' in normPatient({rec: v}), false); assert.equal('recExc' in normPatient({recExc: v}), false); }
 });
 
 test('normRec: dias validos, hora e datas com padrao seguro', () => {
@@ -118,12 +115,18 @@ test('normVisit: serie, serieData, manual e ex validos', () => {
   assert.deepEqual(['serie' in w, 'serieData' in w, 'manual' in w, 'ex' in w], [false, false, false, false]);
 });
 
-test('QUIRK registrado (ACHADO a corrigir em PR proprio): serieData invalida passa como texto e iria ao banco', () => {
-  // normVisit so grava serieData quando e data valida, mas depois keepExtra copia o texto original.
-  // app.js (pushAll) envia v.serieData em serie_data quando serie===pacienteId; o Postgres recusa "2026-02-30"
-  // e as gravacoes da conta ficam travadas. So acontece com arquivo de backup adulterado ou corrompido.
-  const w = normVisit({date: '2026-11-23', serie: 'p1', serieData: '2026-02-30', manual: 'sim', ex: 1});
-  assert.equal(w.serieData, '2026-02-30'); assert.equal(w.manual, 'sim'); assert.equal(w.ex, 1); assert.equal(w.serie, 'p1');
+test('E7 corrigido: serieData invalida e descartada e nao chega ao banco (antes passava como texto e o Postgres recusava o lote)', () => {
+  const w = normVisit({date: '2026-11-23', serie: 'p1', serieData: '2026-02-30', manual: 'sim', ex: 1, virtual: true});
+  assert.equal('serieData' in w, false); assert.equal('manual' in w, false); assert.equal('ex' in w, false);
+  assert.equal('virtual' in w, false);          // "virtual" vindo de fora faria o atendimento nunca ser gravado
+  assert.equal(w.serie, 'p1');                  // a serie (o paciente) continua; sem data, a linha vai com serie_data nula
+  for (const v of ['', 'x', 20261123, null]) assert.equal('serieData' in normVisit({date: '2026-11-23', serie: 'p1', serieData: v}), false, String(v));
+});
+
+test('campos desconhecidos continuam preservados (so os conhecidos e invalidos sao descartados)', () => {
+  assert.equal(normVisit({date: '2026-11-23', anotacao: 'x'}).anotacao, 'x');
+  assert.equal(normPatient({id: 'a', apelido: 'Zé'}).apelido, 'Zé');
+  assert.equal(normCompany({nome: 'E', site: 'w'}).site, 'w');
 });
 
 test('keepExtra: preserva so texto, numero finito e booleano; ignora chaves perigosas', () => {
