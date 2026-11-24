@@ -1,0 +1,5 @@
+# Scripts de shell e arquivos copiados ao repositorio privado precisam de fim de linha LF (CRLF quebra o bash no Windows)
+*.sh text eol=lf
+*.yml text eol=lf
+*.sql text eol=lf
+.gitignore text eol=lf
