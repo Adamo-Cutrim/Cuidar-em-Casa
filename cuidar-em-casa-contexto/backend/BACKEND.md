@@ -412,6 +412,8 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 - Dados de exemplo (`ex: true`) não vão para o banco; paciente real ligado a empresa de exemplo grava `company_id = null`.
 - Verificado em 18/11/2026: 57 verificações de navegador contra o mock `testes/harness.py` (que reproduz colunas, uuid, constraints, FKs compostas, cascatas e RLS) e as mesmas gravações em SQL no banco real, como usuário autenticado, numa transação desfeita (0 linhas e 0 usuários depois).
 
+- **v17 (24/11/2026):** a camada de dados descrita acima agora está em `site/src/data/rows.js` (mapa app ↔ banco, seção 9.6) e `site/src/data/sync.js` (gravação incremental e ordem de envio). O cliente HTTP/sessão continua no `app.js` até a v17 parte 3b.
+
 ## 13. Histórico deste documento
 
 | Data | Mudança |
