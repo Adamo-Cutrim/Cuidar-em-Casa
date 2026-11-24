@@ -243,7 +243,7 @@ body.locked .app,body.locked .fab,body.locked .tabbar{display:none}
 .tile .tl{font-size:var(--fs-sm);font-weight:600}
 .tile .tv{font:700 var(--fs-2xl)/1.1 var(--display);letter-spacing:-.01em;overflow-wrap:anywhere}
 .tile .ts{font-size:var(--fs-sm)}
-@media (max-width:370px){.tile .tv{font-size:var(--fs-xl)}}
+@media (max-width:370px){.tile .tv{font-size:var(--fs-xl)}.rep-tiles{grid-template-columns:1fr}}
 .tile.real{background:var(--accent);color:#fff}
 .tile.prev{background:var(--surface);border:1px solid var(--line)}
 .tile.prev .tl,.tile.prev .ts{color:var(--muted)}
