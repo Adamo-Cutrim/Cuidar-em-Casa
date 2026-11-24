@@ -162,6 +162,21 @@ Regra de ouro: **não mudar comportamento e estrutura na mesma versão.** Refato
 
 ---
 
+## 5b. Roteiro depois da v17 (decidido em 24/11/2026)
+
+A v17 reorganizou o código sem mudar comportamento; E1 a E7 foram corrigidos. A ordem abaixo põe as mudanças de esquema **antes** do uso offline, para não refazer a camada de dados duas vezes.
+
+| Etapa | Entrega | Depende de |
+|---|---|---|
+| v18a | **Valor no histórico**: `visits.valor_snapshot`, gravado ao marcar como feito; o relatório usa o valor guardado nos feitos (BACKEND §11 item 1) | migração + app + testes antes |
+| v18b | **Tipos ligados à lista**: `visits.service_type_id`, migração dos textos atuais, cadastro de novos tipos (BACKEND §11 item 3) | v18a (mesma janela de migração) |
+| v19 | **Backup automático gratuito** (`backend/BACKUP_SEM_PLANO_PAGO.md`) | decisões do usuário: destino, guarda da chave, retenção; roteiro dos passos manuais |
+| v20a | **Offline 1**: service worker, o app abre sem internet | v18 |
+| v20b | **Offline 2**: dados guardados no aparelho, leitura sem rede | decisão do usuário sobre segurança no aparelho |
+| v20c | **Offline 3**: registrar sem rede e sincronizar ao voltar (a gravação incremental atual já sabe o que falta enviar), com política de conflito | v20b |
+
+Cada mudança de comportamento: PR próprio, teste escrito antes (falhando pelo motivo certo), verificação de navegador e, quando mexer no banco, migração aplicada com cuidado e conferida.
+
 ## 6. Decisões em aberto que afetam a estrutura
 
 Lista completa em `backend/BACKEND.md` §11. As que mudam a forma do código:
@@ -241,6 +256,7 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 
 | Data | Mudança |
 |---|---|
+| 24/11/2026 | (Claude Code) **Decisões do usuário** sobre BACKEND §11 itens 1, 3 e 6 (valor no histórico ao marcar feito; tipos ligados à lista; offline necessário) e pedido de backup automático sem plano pago. Levantamento em `backend/BACKUP_SEM_PLANO_PAGO.md` (achado: o repositório do projeto é público, então nenhum backup pode ir para ele). Roteiro novo na seção 5b. |
 | 24/11/2026 | (Claude Code) **E6 corrigido** (mudança de comportamento, PR próprio): valor em reais aceita ponto de milhar sem vírgula e recusa negativo e valor de 1 bilhão para cima. 2 unitários e 2 verificações de navegador falhavam antes; depois, 134 + 57 + 54 sem falhas. |
 | 24/11/2026 | (Claude Code) **E7 corrigido** (mudança de comportamento, PR próprio): campos opcionais recusados pelo validador não voltam mais como "campo extra". Testes antes da correção: 4 unitários e 7 verificações de navegador falhavam; depois, 132 unitários + 57 + 52 sem falhas. |
 | 24/11/2026 11:35 | (Claude Code) **v17 parte 4 — v17 fechada** (`versoes/v17_2026-11-24_1135_site/`). O resto do `app.js` (telas, formulários, ações, conta, gravação) foi dividido em `src/app/*` e `src/ui/*` por um **gerador** que não reescreve código: move cada declaração para o arquivo da sua área, troca por `st.X` só as referências (pelo mapa de escopos) às 13 variáveis que mais de uma área altera, e escreve import/export exatos. Provas: os 22 586 tokens do código antigo são idênticos aos dos módulos (sem import/export e sem o prefixo `st.`); a ordem dos 26 ouvintes de evento é a mesma da `main` (controle que troca dois de lugar: acusa); suíte 131 + 57 + 44 sem falhas; lint 0 erros. O `rodar_testes.sh` passou a trocar o endereço do Supabase em **todos** os arquivos (estava só no `app.js`; o primeiro teste da parte 4 tentou o Supabase real e a CSP bloqueou — conferido no banco: nenhuma conta criada) e para se sobrar algum. |
