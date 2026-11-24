@@ -19,7 +19,7 @@ with sync_playwright() as p:
     st=pg.evaluate("JSON.stringify({l:Object.keys(localStorage),s:Object.keys(sessionStorage)})"); print('   storage chaves:',st)
     print('   Helena em storage:', 'Helena' in pg.evaluate("JSON.stringify(localStorage)+JSON.stringify(sessionStorage)"))
     print('3) abrir formulario de empresa')
-    pg.locator('.tabs button').nth(2).click(); pg.wait_for_timeout(300); pg.locator('#fab').click(); pg.wait_for_timeout(400)
+    pg.locator('[data-action="tab"][data-tab="empresas"]').click(); pg.wait_for_timeout(300); pg.locator('#fab').click(); pg.wait_for_timeout(400)
     print('   form:',pg.eval_on_selector('.sheet form','f=>f.id+" :: "+Array.from(f.elements).map(e=>e.name).join(",")'))
     pg.screenshot(path=SHOT+'sb_form.png')
     print('erros:',errs); b.close()

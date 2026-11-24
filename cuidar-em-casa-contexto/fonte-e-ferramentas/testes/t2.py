@@ -122,6 +122,10 @@ with sync_playwright() as p:
     q.locator('[data-action="clear-demo"]').click(); chk('Q1 apagar exemplos salva so o perfil', saved(q) and rows('profiles', E)[0]['iniciado'] is True and not rows('patients', E))
     add_company(q, 'Vida Plena', '180,00'); saved(q)
     co = rows('companies', E); chk('Q2 empresa com valor_padrao numerico', len(co) == 1 and co[0]['valor_padrao'] == 180.0 and co[0]['tipo'] == 'Operadora de saúde', co)
+    rot = {}
+    for t_ in ('agenda', 'pacientes', 'empresas'): tab(q, t_); rot[t_] = (q.locator('#fab .lbl').inner_text(), q.locator('#fab').get_attribute('aria-label'))
+    chk('Q2b botao + do meio da barra muda por aba', rot == {'agenda': ('Agendar', 'Novo atendimento'), 'pacientes': ('Paciente', 'Novo paciente'), 'empresas': ('Empresa', 'Nova empresa')}, rot)
+    chk('Q2c botao + fica no meio das 5 posicoes da barra', q.locator('#tabs > *').evaluate_all('els=>els.map(e=>e.id==="fab"?"+":e.dataset.tab||"menu")') == ['agenda', 'pacientes', '+', 'empresas', 'menu'])
     tab(q, 'pacientes'); q.locator('#fab').click(); q.wait_for_selector('#f-patient')
     q.fill('#p-nome', 'João Souza'); q.fill('#p-nasc', '12/03/1944'); q.fill('#p-tel', '(11) 98888-0000'); q.fill('#p-rn', 'Maria (filha)'); q.fill('#p-rt', '(11) 97777-0000')
     q.fill('#p-end', 'Rua A, 10'); q.fill('#p-bai', 'Centro'); q.select_option('#p-emp', co[0]['id']); q.fill('#p-val', '150,00')
