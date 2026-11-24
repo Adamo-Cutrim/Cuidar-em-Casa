@@ -1,0 +1,55 @@
+name: Backup do banco
+
+# Copia o banco do Cuidar em Casa todo dia, cifra e guarda como artefato (30 dias por padrao).
+# ESTE ARQUIVO SO DEVE EXISTIR NUM REPOSITORIO PRIVADO. Em repositorio publico, logs e artefatos ficam acessiveis a qualquer pessoa.
+on:
+  schedule:
+    - cron: '30 5 * * *'     # 05:30 UTC = 02:30 em Brasilia
+  workflow_dispatch:         # botao "Run workflow" na aba Actions
+
+permissions:
+  contents: write            # so para registrar o batimento (ultimo-backup.txt) e manter o agendador ligado
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Baixar o repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar o cliente PostgreSQL 17 e o age
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common age
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+          age --version
+
+      - name: Fazer o backup (cifrado)
+        env:
+          DB_URL: ${{ secrets.BACKUP_DB_URL }}
+          AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
+        run: bash scripts/fazer-backup.sh
+
+      - name: Guardar o arquivo cifrado
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_id }}
+          path: saida/*.age
+          retention-days: ${{ vars.BACKUP_RETENCAO_DIAS || 30 }}
+          if-no-files-found: error
+
+      - name: Registrar o batimento (so contagens, sem dado pessoal; mantem o agendador ligado)
+        run: |
+          cp saida/resumo.txt ultimo-backup.txt
+          git config user.name  "backup-automatico"
+          git config user.email "backup-automatico@users.noreply.github.com"
+          git add ultimo-backup.txt
+          git commit -m "Backup de $(date -u +%Y-%m-%d)" || echo "sem mudanca no resumo"
+          git push
