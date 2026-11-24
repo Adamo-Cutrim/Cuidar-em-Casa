@@ -33,7 +33,7 @@ def mudar_valor_paciente(pg, nome, valor):
     pg.locator('[data-action="open-patient"]', has_text=nome).first.click(); pg.wait_for_selector('.sheet [data-action="edit-patient"]'); pg.locator('.sheet [data-action="edit-patient"]').click()
     pg.wait_for_selector('#f-patient'); pg.fill('#p-val', valor); pg.locator('#f-patient button[type=submit]').click(); saved(pg)
 def relatorio_realizado(pg):
-    pg.locator('[data-action="tab"][data-tab="pacientes"]').click(); pg.wait_for_timeout(200); pg.locator('[data-action="open-report"]').first.click(); pg.wait_for_selector('.tile.real')
+    pg.locator('[data-action="open-menu"]').click(); pg.wait_for_timeout(250); pg.locator('[data-go="fatur"]').click(); pg.wait_for_selector('.tile.real')   # o Faturamento mora no Menu desde o PR #18
     t = pg.locator('.tile.real .tv').inner_text().replace('\xa0', ' '); pg.locator('.sheet [data-action="close-sheet"]').first.click(); pg.wait_for_timeout(250); return t
 def visita(email): v = rows('visits', email); return v[0] if v else None
 
