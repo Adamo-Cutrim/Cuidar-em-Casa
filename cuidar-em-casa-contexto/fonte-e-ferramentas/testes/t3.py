@@ -148,4 +148,14 @@ with sync_playwright() as p:
     chk('empresa excluida nao volta ao recarregar', 'Empresa E7' not in p3.locator('#view').inner_text())
     chk('paciente do arquivo nao virou "exemplo" (ex:"sim" ignorado)', any(r['nome'] == 'Paciente E7' for r in rows('patients', E_E7)))
 
+    print('I) valor em reais (E6): ponto de milhar e valor negativo')
+    p3.locator('[data-action="tab"][data-tab="pacientes"]').click(); p3.wait_for_timeout(250); p3.locator('#fab').click(); p3.wait_for_selector('#f-patient')
+    p3.fill('#f-patient [name=nome]', 'Paciente Negativo'); p3.fill('#p-val', '-5'); p3.locator('#f-patient button[type=submit]').click(); p3.wait_for_timeout(400)
+    aberto = p3.locator('#f-err').count() > 0; aviso = p3.locator('#f-err').inner_text() if aberto else '(formulario fechou: aceitou o valor)'
+    saved(p3); chk('"-5" pede valor valido e nao grava', 'Informe um valor válido' in aviso and not any(r['nome'] == 'Paciente Negativo' for r in rows('patients', E_E7)), aviso)
+    if not aberto: p3.locator('#fab').click(); p3.wait_for_selector('#f-patient')
+    p3.fill('#f-patient [name=nome]', 'Paciente Mil'); p3.fill('#p-val', '1.234'); p3.locator('#f-patient button[type=submit]').click(); saved(p3)
+    pm = [r for r in rows('patients', E_E7) if r['nome'] == 'Paciente Mil']
+    chk('"1.234" grava mil duzentos e trinta e quatro reais', len(pm) == 1 and pm[0]['valor'] == 1234, pm and pm[0]['valor'])
+
     print('\nresultado: %d ok, %d falhas | erros JS/console: %s' % (ok[0], ok[1], errs)); b.close()
