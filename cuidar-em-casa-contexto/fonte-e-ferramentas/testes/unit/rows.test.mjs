@@ -132,10 +132,10 @@ test('desiredRows: nao altera o estado e e repetivel', () => {
   for (const t of T_ORDER) assert.deepEqual([...a[t]], [...b[t]]);
 });
 
-test('QUIRK registrado (E7): serieData invalida do estado chega a serie_data da linha', () => {
-  // normalize deixa passar texto invalido como "campo extra"; aqui ele seria enviado e o Postgres recusaria. Corrigir em PR proprio.
-  const s = {companies: [], patients: [{id: U(11), nome: 'M', valor: 1}], visits: [{id: U(21), pacienteId: U(11), date: '2026-11-10', hora: '08:00', tipo: '', obs: '', status: 'agendado', serie: U(11), serieData: '2026-02-30'}], perfil: {}};
-  assert.equal(desiredRows(s, USER, new Map()).visits.get(U(21)).serie_data, '2026-02-30');
+test('E7 corrigido: depois de normalize, serieData invalida nao chega a serie_data da linha', () => {
+  const s = normalize({companies: [], patients: [{id: U(11), nome: 'M', valor: 1}], visits: [{id: U(21), pacienteId: U(11), date: '2026-11-10', hora: '08:00', tipo: '', obs: '', status: 'agendado', serie: U(11), serieData: '2026-02-30'}]});
+  const row = desiredRows(s, USER, new Map()).visits.get(U(21));
+  assert.equal(row.serie_data, null); assert.equal(row.data, '2026-11-10');
 });
 
 // ---- rowsToRaw: do jeito que o banco devolve ----
