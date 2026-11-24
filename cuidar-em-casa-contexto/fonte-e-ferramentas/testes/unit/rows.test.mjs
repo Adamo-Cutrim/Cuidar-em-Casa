@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {T_ORDER, T_CONFLICT, dbId, tipoKey, dbTime, profRow, desiredRows, rowsToRaw} from '../../../site/src/data/rows.js';
 import {hashUuid, isUuid} from '../../../site/src/core/ids.js';
+import {renameTipoNoEstado, deleteTipoNoEstado} from '../../../site/src/domain/tipos.js';
 import {normalize} from '../../../site/src/domain/validation.js';
 
 const USER = 'bbbbbbbb-1111-4111-8111-000000000001';
@@ -34,7 +35,7 @@ function estado() {
 }
 
 test('constantes: ordem das tabelas e chaves de conflito', () => {
-  assert.deepEqual(T_ORDER, ['companies', 'patients', 'visits', 'recurrences', 'recurrence_exceptions', 'service_types']);
+  assert.deepEqual(T_ORDER, ['companies', 'patients', 'service_types', 'visits', 'recurrences', 'recurrence_exceptions']);   // v18b: service_types antes de quem a referencia
   assert.deepEqual(T_CONFLICT, {companies: 'id', patients: 'id', visits: 'id', recurrences: 'patient_id', recurrence_exceptions: 'patient_id,data', service_types: 'id'});
 });
 
@@ -91,7 +92,7 @@ test('desiredRows: paciente ligado a empresa de exemplo grava sem empresa', () =
 
 test('desiredRows: recorrencia e excecoes', () => {
   const D = desiredRows(estado(), USER, new Map());
-  assert.deepEqual(D.recurrences.get(U(11)), {patient_id: U(11), user_id: USER, ativo: true, dias: [1, 3], hora: '09:00', tipo: 'Curativo', inicio: '2026-11-01', fim: null});
+  assert.deepEqual(D.recurrences.get(U(11)), {patient_id: U(11), user_id: USER, ativo: true, dias: [1, 3], hora: '09:00', tipo: 'Curativo', inicio: '2026-11-01', fim: null, service_type_id: hashUuid(USER + '|tipo|curativo')});
   const ana = D.recurrences.get(dbId(USER, 'p-curto'));
   assert.deepEqual([ana.ativo, ana.dias, ana.fim], [false, [], '2026-12-31']);
   assert.deepEqual([...D.recurrence_exceptions.keys()], [U(11) + '|2026-11-11', U(11) + '|2026-11-18']);
@@ -102,7 +103,7 @@ test('desiredRows: recorrencia e excecoes', () => {
 
 test('desiredRows: atendimento (serie_data so quando a serie e do proprio paciente)', () => {
   const D = desiredRows(estado(), USER, new Map());
-  assert.deepEqual(D.visits.get(U(21)), {id: U(21), user_id: USER, patient_id: U(11), data: '2026-11-10', hora: '08:30', tipo: 'Curativo', obs: 'n', status: 'feito', serie_data: null, manual: false, valor_snapshot: 150});
+  assert.deepEqual(D.visits.get(U(21)), {id: U(21), user_id: USER, patient_id: U(11), data: '2026-11-10', hora: '08:30', tipo: 'Curativo', obs: 'n', status: 'feito', serie_data: null, manual: false, valor_snapshot: 150, service_type_id: hashUuid(USER + '|tipo|curativo')});
   const idMat = dbId(USER, 'r-' + U(11) + '-2026-11-23');
   assert.equal(idMat, hashUuid(USER + '|r-' + U(11) + '-2026-11-23'));
   assert.equal(D.visits.get(idMat).serie_data, '2026-11-23'); assert.equal(D.visits.get(idMat).patient_id, U(11));
@@ -241,4 +242,70 @@ test('v18a: rowsToRaw: valor_snapshot so volta para atendimento feito; numerico 
   const vs = Object.fromEntries(rowsToRaw(t).raw.visits.map(v => [v.id, v]));
   assert.strictEqual(vs[U(35)].valorSnapshot, 80.5); assert.strictEqual(vs[U(36)].valorSnapshot, null); assert.ok('valorSnapshot' in vs[U(36)]);
   assert.equal('valorSnapshot' in vs[U(22)], false);                             // agendado: sem o campo
+});
+
+// ---- v18b: tipo ligado a lista ----
+const CUR = hashUuid(USER + '|tipo|curativo');
+test('v18b: atendimento e recorrencia apontam para o id do tipo da lista; sem tipo ou fora da lista = null', () => {
+  const st = estado();
+  st.visits.push({id: U(40), pacienteId: U(11), date: '2026-11-12', hora: '08:00', tipo: 'curativo', obs: '', status: 'agendado'});          // minusculo: e o mesmo tipo
+  st.visits.push({id: U(41), pacienteId: U(11), date: '2026-11-13', hora: '08:00', tipo: '', obs: '', status: 'agendado'});
+  st.visits.push({id: U(42), pacienteId: U(11), date: '2026-11-14', hora: '08:00', tipo: 'Tipo apagado', obs: '', status: 'agendado'});     // nome que nao esta mais na lista
+  const D = desiredRows(st, USER, new Map());
+  assert.equal(D.visits.get(U(21)).service_type_id, CUR); assert.equal(D.visits.get(U(40)).service_type_id, CUR);
+  assert.equal(D.visits.get(U(41)).service_type_id, null); assert.equal(D.visits.get(U(42)).service_type_id, null);
+  assert.equal(D.visits.get(U(42)).tipo, 'Tipo apagado');                          // o nome continua no atendimento (a tela promete: "mantem o nome")
+  assert.ok([...D.visits.values()].every(r => 'service_type_id' in r) && [...D.recurrences.values()].every(r => 'service_type_id' in r));
+});
+
+test('v18b: sem lista de tipos criada (S.tipos ausente) nada e ligado, so o nome vai', () => {
+  const st = estado(); delete st.tipos;
+  const D = desiredRows(st, USER, new Map());
+  assert.equal(D.service_types.size, 0); assert.equal(D.visits.get(U(21)).service_type_id, null); assert.equal(D.visits.get(U(21)).tipo, 'Curativo');
+});
+
+test('v18b: usa o id que o banco ja tem para o tipo', () => {
+  const D = desiredRows(estado(), USER, new Map([['curativo', 'tid-do-banco']]));
+  assert.ok(D.service_types.has('tid-do-banco')); assert.equal(D.visits.get(U(21)).service_type_id, 'tid-do-banco');
+  assert.equal(D.recurrences.get(U(11)).service_type_id, 'tid-do-banco');
+});
+
+test('v18b: renomear mantem o MESMO id do tipo (a linha e atualizada, nao trocada) e os atendimentos continuam ligados', () => {
+  const st = estado(), ids = new Map([['curativo', 'tid-do-banco']]);
+  const antes = desiredRows(st, USER, ids);
+  renameTipoNoEstado(st, ids, USER, 'Curativo', 'Curativo simples');
+  const depois = desiredRows(st, USER, ids);
+  assert.deepEqual(depois.service_types.get('tid-do-banco'), {id: 'tid-do-banco', user_id: USER, nome: 'Curativo simples'});
+  assert.equal(depois.service_types.has(CUR), false);
+  assert.equal(depois.visits.get(U(21)).service_type_id, 'tid-do-banco'); assert.equal(depois.visits.get(U(21)).tipo, 'Curativo simples');
+  assert.equal(depois.recurrences.get(U(11)).service_type_id, 'tid-do-banco');
+  assert.deepEqual([...antes.service_types.keys()], [...depois.service_types.keys()].filter(k => k === 'tid-do-banco' || antes.service_types.has(k)));   // o mesmo conjunto de ids antes e depois
+  assert.equal(depois.service_types.size, antes.service_types.size);
+});
+
+test('v18b: tipo que nunca foi ao banco tambem conserva o id ao renomear', () => {
+  const st = estado(), ids = new Map();
+  renameTipoNoEstado(st, ids, USER, 'Curativo', 'Curativo simples');
+  const D = desiredRows(st, USER, ids);
+  assert.ok(D.service_types.has(CUR)); assert.equal(D.service_types.get(CUR).nome, 'Curativo simples');       // o id calculado do nome ANTIGO
+  assert.equal(D.visits.get(U(21)).service_type_id, CUR);
+});
+
+test('v18b: excluir o tipo da lista desliga a ligacao mas o atendimento guarda o nome', () => {
+  const st = estado(); deleteTipoNoEstado(st, 'Curativo');
+  const D = desiredRows(st, USER, new Map());
+  assert.equal(D.service_types.has(CUR), false); assert.equal(D.visits.get(U(21)).service_type_id, null); assert.equal(D.visits.get(U(21)).tipo, 'Curativo');
+});
+
+test('v18b: rowsToRaw: o nome vem do tipo ligado (vence o texto antigo); sem ligacao, vale o texto', () => {
+  const t = resposta();
+  t.serviceTypes = [{id: 't-cur', nome: 'Curativo simples'}, {id: 't-fis', nome: 'Fisio'}];
+  t.visits = [
+    {id: U(50), patient_id: U(11), data: '2026-11-10', hora: '08:00:00', tipo: 'Curativo', obs: '', status: 'agendado', serie_data: null, manual: false, valor_snapshot: null, service_type_id: 't-cur'},   // texto desatualizado
+    {id: U(51), patient_id: U(11), data: '2026-11-11', hora: '08:00:00', tipo: 'Nome solto', obs: '', status: 'agendado', serie_data: null, manual: false, valor_snapshot: null, service_type_id: null},
+    {id: U(52), patient_id: U(11), data: '2026-11-12', hora: '08:00:00', tipo: 'Antigo', obs: '', status: 'agendado', serie_data: null, manual: false, valor_snapshot: null, service_type_id: 'id-que-nao-existe'}];
+  t.recurrences = [{patient_id: U(11), ativo: true, dias: [1], hora: '09:00:00', tipo: 'Antigo', inicio: '2026-11-01', fim: null, service_type_id: 't-fis'}];
+  const raw = rowsToRaw(t).raw, vs = Object.fromEntries(raw.visits.map(v => [v.id, v.tipo]));
+  assert.deepEqual([vs[U(50)], vs[U(51)], vs[U(52)]], ['Curativo simples', 'Nome solto', 'Antigo']);
+  assert.equal(raw.patients.find(p => p.id === U(11)).rec.tipo, 'Fisio');
 });

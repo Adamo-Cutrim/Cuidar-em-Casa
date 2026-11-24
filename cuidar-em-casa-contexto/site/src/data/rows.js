@@ -1,13 +1,15 @@
 /* Estado do app <-> linhas das tabelas do Supabase (BACKEND.md seções 9.2 e 9.6). Sem rede, sem DOM, sem variável global:
    o usuário, o estado e os ids de tipos já existentes entram como argumento. */
 import {isUuid,hashUuid} from '../core/ids.js';
+import {tipoKey,tipoId} from '../domain/tipos.js';
 
-export const T_ORDER=['companies','patients','visits','recurrences','recurrence_exceptions','service_types'];
+/* Ordem de gravação: pais antes de filhos. O tipo (service_types) vem antes dos atendimentos e recorrências que o referenciam (v18b). */
+export const T_ORDER=['companies','patients','service_types','visits','recurrences','recurrence_exceptions'];
 export const T_CONFLICT={companies:'id',patients:'id',visits:'id',recurrences:'patient_id',recurrence_exceptions:'patient_id,data',service_types:'id'};
 /* Id que não é uuid (ex.: ocorrência recorrente que virou registro, "r-{paciente}-{data}") ganha um uuid fixo,
    calculado do id e do usuário: é sempre a mesma linha no banco e não colide com a de outro usuário. */
 export const dbId=(userId,id)=>isUuid(id)?id:hashUuid(userId+'|'+id);
-export const tipoKey=n=>String(n).trim().toLowerCase();
+export {tipoKey};
 export const dbTime=h=>typeof h==='string'?h.slice(0,5):'';
 
 export function profRow(perfil){
@@ -19,6 +21,17 @@ export function desiredRows(state,userId,tipoIds){
   const uid=userId,D={};
   const dbId_=id=>dbId(userId,id);
   T_ORDER.forEach(function(t){D[t]=new Map();});
+  /* Tipos de atendimento da lista, antes de tudo: atendimentos e recorrências apontam para o id do tipo (v18b). */
+  const tipoPorChave=new Map();
+  if(Array.isArray(state.tipos)) state.tipos.forEach(function(n){
+    const k=tipoKey(n);
+    if(!k) return;
+    const id=tipoId(tipoIds,uid,n);
+    if(D.service_types.has(id)) return;
+    D.service_types.set(id,{id:id,user_id:uid,nome:String(n).trim()});
+    tipoPorChave.set(k,id);
+  });
+  const linkTipo=n=>(n&&tipoPorChave.get(tipoKey(n)))||null;
   const comps=new Set();
   state.companies.forEach(function(c){
     if(c.ex) return;
@@ -33,20 +46,14 @@ export function desiredRows(state,userId,tipoIds){
       resp_nome:p.respNome||'',resp_tel:p.respTel||'',endereco:p.endereco||'',bairro:p.bairro||'',ref:p.ref||'',valor:p.valor==null?null:p.valor,
       condicoes:p.condicoes||'',alergias:p.alergias||'',medicamentos:p.medicamentos||'',obs:p.obs||''});
     const r=p.rec;
-    if(r) D.recurrences.set(id,{patient_id:id,user_id:uid,ativo:!!r.ativo,dias:r.dias.slice(),hora:r.hora,tipo:r.tipo||'',inicio:r.inicio,fim:r.fim||null});
+    if(r) D.recurrences.set(id,{patient_id:id,user_id:uid,ativo:!!r.ativo,dias:r.dias.slice(),hora:r.hora,tipo:r.tipo||'',inicio:r.inicio,fim:r.fim||null,service_type_id:linkTipo(r.tipo)});
     (p.recExc||[]).forEach(function(d){D.recurrence_exceptions.set(id+'|'+d,{patient_id:id,user_id:uid,data:d});});
   });
   state.visits.forEach(function(v){
     if(v.ex||v.virtual||!pats.has(v.pacienteId)) return;
     const id=dbId_(v.id);
     D.visits.set(id,{id:id,user_id:uid,patient_id:dbId_(v.pacienteId),data:v.date,hora:v.hora,tipo:v.tipo||'',obs:v.obs||'',status:v.status,
-      serie_data:v.serie===v.pacienteId&&v.serieData?v.serieData:null,manual:!!v.manual,valor_snapshot:v.status==='feito'&&v.valorSnapshot!=null?v.valorSnapshot:null});
-  });
-  if(Array.isArray(state.tipos)) state.tipos.forEach(function(n){
-    const k=tipoKey(n);
-    if(!k||D.service_types.has(tipoIds.get(k)||hashUuid(uid+'|tipo|'+k))) return;
-    const id=tipoIds.get(k)||hashUuid(uid+'|tipo|'+k);
-    D.service_types.set(id,{id:id,user_id:uid,nome:String(n).trim()});
+      serie_data:v.serie===v.pacienteId&&v.serieData?v.serieData:null,manual:!!v.manual,valor_snapshot:v.status==='feito'&&v.valorSnapshot!=null?v.valorSnapshot:null,service_type_id:linkTipo(v.tipo)});
   });
   return D;
 }
@@ -54,10 +61,11 @@ export function desiredRows(state,userId,tipoIds){
    t = {profile,companies,patients,visits,recurrences,exceptions,serviceTypes}, cada um uma lista de linhas. */
 export function rowsToRaw(t){
   const p=(Array.isArray(t.profile)&&t.profile[0])||null;
+  const tipoIds=new Map(),nomeTipo=new Map();t.serviceTypes.forEach(function(x){tipoIds.set(tipoKey(x.nome),x.id);nomeTipo.set(x.id,x.nome);});
+  const nomeDe=(id,texto)=>(id&&nomeTipo.get(id))||texto;   /* ligado a um tipo: vale o nome atual dele; senão, o texto guardado (v18b) */
   const recs=new Map(),excs=new Map();
-  t.recurrences.forEach(function(x){recs.set(x.patient_id,{ativo:x.ativo,dias:x.dias,hora:dbTime(x.hora),tipo:x.tipo,inicio:x.inicio,fim:x.fim||''});});
+  t.recurrences.forEach(function(x){recs.set(x.patient_id,{ativo:x.ativo,dias:x.dias,hora:dbTime(x.hora),tipo:nomeDe(x.service_type_id,x.tipo),inicio:x.inicio,fim:x.fim||''});});
   t.exceptions.forEach(function(x){if(!excs.has(x.patient_id)) excs.set(x.patient_id,[]);excs.get(x.patient_id).push(x.data);});
-  const tipoIds=new Map();t.serviceTypes.forEach(function(x){tipoIds.set(tipoKey(x.nome),x.id);});
   const raw={
     companies:t.companies.map(x=>({id:x.id,nome:x.nome,tipo:x.tipo,contato:x.contato,valorPadrao:x.valor_padrao,pagamento:x.pagamento,obs:x.obs,cor:x.cor})),
     patients:t.patients.map(function(x){
@@ -68,7 +76,7 @@ export function rowsToRaw(t){
       return o;
     }),
     visits:t.visits.map(function(x){
-      const o={id:x.id,pacienteId:x.patient_id,date:x.data,hora:dbTime(x.hora),tipo:x.tipo,obs:x.obs,status:x.status};
+      const o={id:x.id,pacienteId:x.patient_id,date:x.data,hora:dbTime(x.hora),tipo:nomeDe(x.service_type_id,x.tipo),obs:x.obs,status:x.status};
       if(x.serie_data){o.serie=x.patient_id;o.serieData=x.serie_data;}
       if(x.manual) o.manual=true;
       if(x.status==='feito') o.valorSnapshot=x.valor_snapshot==null?null:Number(x.valor_snapshot);

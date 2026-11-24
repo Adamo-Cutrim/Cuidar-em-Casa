@@ -1,0 +1,7 @@
+Fontes usadas pelo Cuidar em Casa, hospedadas junto com o site para nao depender de terceiros.
+
+- Bricolage Grotesque: Copyright 2022 The Bricolage Grotesque Project Authors (https://github.com/ateliertriay/bricolage)
+- Figtree: Copyright 2022 The Figtree Project Authors (https://github.com/erikdkennedy/figtree)
+
+Ambas sob a SIL Open Font License, Version 1.1 (https://openfontlicense.org).
+Os arquivos .woff2 sao as versoes distribuidas pelo Google Fonts (subconjuntos latin e latin-ext), sem modificacao.
