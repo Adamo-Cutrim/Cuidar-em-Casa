@@ -185,6 +185,7 @@ export function openMenu(){
     row('config','gear','Configurações','Preferências do app')+
     row('notif','bell','Notificações','Avisos e lembretes')+
     row('atend','list','Atendimentos',nt+(nt===1?' tipo cadastrado':' tipos cadastrados'))+
+    row('fatur','chart','Faturamento','Relatório por paciente ou empresa')+
     '</ul>';
   openSheet('Menu',b);
 }
