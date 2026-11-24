@@ -24,11 +24,6 @@ function setWeek(start){
 }
 const A={
   'tab':function(el){ui.tab=el.dataset.tab;renderAll();window.scrollTo(0,0);},
-  'toggle-hide':function(){
-    st.hide=!st.hide;writeLocal(HIDE_KEY,st.hide?'1':'0');
-    renderTop();renderView();
-    toast(st.hide?'Valores ocultos.':'Valores visíveis.');
-  },
   'toggle-hide-sheet':function(el){
     st.hide=!st.hide;writeLocal(HIDE_KEY,st.hide?'1':'0');
     renderTop();renderView();openPatient(el.dataset.id);
@@ -89,6 +84,7 @@ const A={
     const g=el.dataset.go;
     if(g==='perfil') openProfile();
     else if(g==='atend'){closeSheet(true);st.lastFocus=null;ui.tab='tipos';renderAll();window.scrollTo(0,0);}
+    else if(g==='fatur'){repInit({by:'paciente',emp:'all',pac:'all'});openReport();}
     else openSoon(g);
   },
   'logout':function(){sair();},

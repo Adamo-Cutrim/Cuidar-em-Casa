@@ -19,8 +19,7 @@ export function renderTop(){
   else if(t==='pacientes') sub=st.S.patients.length+(st.S.patients.length===1?' paciente cadastrado':' pacientes cadastrados');
   else if(t==='tipos'){const n=tiposList().length;sub=n+(n===1?' tipo de atendimento':' tipos de atendimento');}
   else sub=st.S.companies.length+(st.S.companies.length===1?' empresa cadastrada':' empresas cadastradas');
-  $('#top').innerHTML='<div class="top-row"><div class="top-text"><h1>'+titles[t]+'</h1><p class="sub">'+esc(sub)+'</p></div>'+
-    (ui.tab==='agenda'||ui.tab==='tipos'?'':'<button type="button" class="eye'+(st.hide?' on':'')+'" data-action="toggle-hide">'+ic(st.hide?'eye':'eye-off')+'<span>'+(st.hide?'Mostrar valores':'Ocultar valores')+'</span></button>')+'</div>';
+  $('#top').innerHTML='<div class="top-row"><div class="top-text"><h1>'+titles[t]+'</h1><p class="sub">'+esc(sub)+'</p></div></div>';
 }
 function renderTabs(){
   const tabs=[['agenda','Agenda','calendar'],['pacientes','Pacientes','users'],['empresas','Empresas','building']];
@@ -94,7 +93,7 @@ function viewPacientes(){
       st.S.companies.map(c=>'<button type="button" class="fchip'+(ui.fcomp===c.id?' sel':'')+'" data-action="filter" data-id="'+c.id+'">'+esc(c.nome)+'</button>').join('')+
       '<button type="button" class="fchip'+(ui.fcomp==='none'?' sel':'')+'" data-action="filter" data-id="none">Particulares</button></div>';
   }
-  return '<button type="button" class="btn rep-btn" data-action="open-report" data-by="paciente">'+ic('chart')+'Relatório de faturamento</button><div class="search">'+ic('search')+'<label for="q" class="sr">Buscar paciente</label><input id="q" type="search" placeholder="Buscar por nome, bairro ou empresa" value="'+esc(ui.q)+'" autocomplete="off"></div>'+f+'<div id="plist"></div>';
+  return '<div class="search">'+ic('search')+'<label for="q" class="sr">Buscar paciente</label><input id="q" type="search" placeholder="Buscar por nome, bairro ou empresa" value="'+esc(ui.q)+'" autocomplete="off"></div>'+f+'<div id="plist"></div>';
 }
 export function renderPatientList(){
   const el=$('#plist');if(!el) return;
@@ -127,7 +126,7 @@ function viewTipos(){
 function viewEmpresas(){
   if(!st.S.companies.length) return '<div class="empty"><p>Nenhuma empresa cadastrada. Cadastre as empresas para as quais você presta serviço e vincule seus pacientes a elas.</p><button type="button" class="btn small primary" data-action="new-company">Cadastrar empresa</button></div>';
   const list=st.S.companies.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
-  return '<button type="button" class="btn rep-btn" data-action="open-report" data-by="empresa">'+ic('chart')+'Relatório de faturamento</button><ul class="group">'+list.map(function(c){
+  return '<ul class="group">'+list.map(function(c){
     const n=st.S.patients.filter(p=>p.empresaId===c.id).length;
     return '<li><button type="button" class="row" data-action="open-company" data-id="'+c.id+'"><span class="av sq c'+(c.cor%6)+'" aria-hidden="true">'+esc(initials(c.nome))+'</span><span class="row-main"><span class="row-name">'+esc(c.nome)+exTag(c)+'</span><span class="row-sub">'+esc(c.tipo||'Empresa')+'</span></span><span class="row-side"><span>'+n+(n===1?' paciente':' pacientes')+'</span></span></button></li>';
   }).join('')+'</ul>';
