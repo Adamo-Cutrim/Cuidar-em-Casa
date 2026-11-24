@@ -25,7 +25,7 @@ Gerado em 18/11/2026. Esta pasta reúne tudo o que existe do projeto "APP para H
 | Pasta | O que tem |
 |---|---|
 | `planejamento/`, `backend/`, `deploy/`, `seguranca/`, `versoes/` | Documentos do Project, iguais aos do claude.ai (v12 a v14 inclusas). |
-| `site/` | **Versão independente do app, pronta para hospedagem** (sem `window.claude`): `index.html`, `app.js`, `styles.css`, `manifest.webmanifest`, `icon.svg`, `vercel.json` (CSP e cabeçalhos de segurança). Fala direto com o Supabase por login real e sincronização por linha. |
+| `site/` | **Versão independente do app, pronta para hospedagem** (sem `window.claude`; desde a v17 o código está em `site/src/`, ver Pendências): `index.html`, `app.js`, `styles.css`, `manifest.webmanifest`, `icon.svg`, `vercel.json` (CSP e cabeçalhos de segurança). Fala direto com o Supabase por login real e sincronização por linha. |
 | `fonte-e-ferramentas/` | `cuidar-em-casa.html` (v14 original), `build_site.py` (gera `site/` a partir do v14), `testes/` (mock do Supabase `harness.py` e testes de navegador `t1.py`, `t2.py`, 37 verificações), `stage-chunks/` (pedaços usados na tentativa de publicar via banco; não veio para o repositório). |
 
 ## Supabase (projeto de testes)
@@ -58,11 +58,15 @@ Passos que estavam pendentes (todos feitos):
 
 ## Pendências conhecidas
 - ~~Google Fonts~~ hospedado junto com o site em 23/11/2026 (`site/fonts/`, licença OFL em `fonts/LICENCAS.txt`; CSP sem domínios de terceiros em `style-src` e `font-src`). Auditoria D fechada.
-- ~~Problemas E1 a E5~~, ~~fontes locais~~ e ~~backup JSON (baixar e restaurar)~~ prontos em 23/11/2026: **v16 fechada** (`versoes/v16_2026-11-23_1754_site/`). Fonte do código agora é `site/` (edição direta). Próxima etapa do roteiro: v17, reorganizar em módulos sem mudar comportamento.
-- Testes: `fonte-e-ferramentas/testes/rodar_testes.sh` roda também no Windows (Git Bash + Python 3 + Playwright). Eles **não detectam** violações de CSP; para isso há a opção `CSP_ESTRITA=1` (só aplica o cabeçalho, a conferência é por console/estilo calculado).
+- ~~Problemas E1 a E5~~, ~~fontes locais~~ e ~~backup JSON (baixar e restaurar)~~ prontos em 23/11/2026: **v16 fechada**. **v17 fechada em 24/11/2026** (`versoes/v17_2026-11-24_1135_site/`): só reorganização; `site/app.js` (só a entrada) e `site/src/`: **core/** (datas, texto, dinheiro, ids, limites), **domain/** (validação, consultas, recorrência, faturamento), **data/** (cliente do Supabase e sessão, mapa estado ↔ linhas, envio), **app/** (estado compartilhado `st`, estado da tela, carregar/gravar, catálogo e exemplos) e **ui/** (campos de data/hora, janelas, telas, fichas, formulários, ações, conta, relatório, backup).
+- **E7 (medido em 24/11/2026 contra o mock):** backup adulterado com `serieData` inexistente (ex.: `2026-02-30`) faz o banco recusar o lote de atendimentos. Cadastrar empresa/paciente continua funcionando, mas **atendimentos novos/alterados, recorrências, exceções e tipos não são salvos, e exclusões de pacientes/empresas não chegam ao banco** (somem da tela e **voltam** ao recarregar). Aviso na tela: só "O servidor recusou salvar um dado". Só acontece com arquivo editado à mão ou corrompido. Correção prevista em PR próprio: validar a data ao importar e não deixar um registro ruim derrubar o lote.
+- **E6:** `parseMoney("1.234")` grava 1,23 (ponto sem vírgula vira decimal).
+- **Troca de deploy:** por alguns segundos, durante a troca, a CDN pode servir o `app.js` novo com um módulo antigo ou ainda ausente (visto em 24/11: `supabase.js` deu 404 logo após o deploy, depois 200). Melhoria possível: versionar os caminhos dos módulos.
+- **Backup sem plano pago:** decisão do usuário (24/11/2026): o profissional não deve precisar fazer backup manual; buscar solução sem Supabase Pro, pesando custo, segurança e LGPD antes de implementar.
+- Testes: `fonte-e-ferramentas/testes/rodar_testes.sh` roda 131 testes unitários (Node, `testes/unit`) e 101 de navegador; roda também no Windows (Git Bash + Python 3 + Playwright). `testes/lint.sh` procura nomes sem import (ESLint `no-undef`). Eles **não detectam** violações de CSP; para isso há a opção `CSP_ESTRITA=1` (só aplica o cabeçalho, a conferência é por console/estilo calculado).
 - Decisões em aberto: `BACKEND.md` seção 11.
 - LGPD: dados de saúde são sensíveis; validar com profissional de proteção de dados antes de usar dados reais.
 
 ## Integridade
-`site/app.js` sha256 `a51fda118a5786d67d6444cbb23c2e16fcbbc919b2c67197a92fea552268f10b` (v16)
+`site/app.js` sha256 `b95e213268680bd92681f20d3e3d5df8c57494e805cc50f6b91da25b99f58abd` (v17, só a entrada; os módulos estão em `versoes/v17_2026-11-24_1135_site/src/`)
 `site/styles.css` sha256 `c40017326b8c6fefdac84369afd5b7a61662376114ef4258c8bbb35442d5ce92`
