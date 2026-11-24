@@ -9,7 +9,7 @@ import {avatar,chip,exTag,repIcon,repMark} from './bits.js';
 import {$,ic} from './dom.js';
 import {dayTitle,weekLabel} from './fields.js';
 /* ---------- telas ---------- */
-export function renderAll(){if(!auth.logged) return;renderTop();renderView();renderTabs();renderFab();}
+export function renderAll(){if(!auth.logged) return;renderTop();renderView();renderTabs();}
 
 export function renderTop(){
   const t=ui.tab;
@@ -21,15 +21,17 @@ export function renderTop(){
   else sub=st.S.companies.length+(st.S.companies.length===1?' empresa cadastrada':' empresas cadastradas');
   $('#top').innerHTML='<div class="top-row"><div class="top-text"><h1>'+titles[t]+'</h1><p class="sub">'+esc(sub)+'</p></div></div>';
 }
-function renderTabs(){
-  const tabs=[['agenda','Agenda','calendar'],['pacientes','Pacientes','users'],['empresas','Empresas','building']];
-  $('#tabs').innerHTML=tabs.map(function(t){
-    return '<button type="button" class="tab" data-action="tab" data-tab="'+t[0]+'"'+(ui.tab===t[0]?' aria-current="page"':'')+'><span class="pill">'+ic(t[2])+'</span>'+t[1]+'</button>';
-  }).join('')+'<button type="button" class="tab" data-action="open-menu" aria-haspopup="dialog"'+(ui.tab==='tipos'?' aria-current="page"':'')+'><span class="pill">'+ic('menu')+'</span>Menu</button>';
+/* Barra de baixo: Agenda, Pacientes, [+], Empresas, Menu. O botão do meio cria o item da tela aberta. */
+const ADD={agenda:['Agendar','Novo atendimento'],pacientes:['Paciente','Novo paciente'],empresas:['Empresa','Nova empresa'],tipos:['Tipo','Novo tipo']};
+function tabBtn(t){
+  return '<button type="button" class="tab" data-action="tab" data-tab="'+t[0]+'"'+(ui.tab===t[0]?' aria-current="page"':'')+'><span class="pill">'+ic(t[2])+'</span>'+t[1]+'</button>';
 }
-function renderFab(){
-  const l={agenda:'Novo atendimento',pacientes:'Novo paciente',empresas:'Nova empresa',tipos:'Novo tipo'}[ui.tab];
-  $('#fab').innerHTML=ic('plus')+'<span>'+l+'</span>';
+function renderTabs(){
+  const a=ADD[ui.tab];
+  $('#tabs').innerHTML=tabBtn(['agenda','Agenda','calendar'])+tabBtn(['pacientes','Pacientes','users'])+
+    '<button type="button" class="tabadd" id="fab" data-action="fab" aria-label="'+a[1]+'"><span class="circ">'+ic('plus')+'</span><span class="lbl">'+a[0]+'</span></button>'+
+    tabBtn(['empresas','Empresas','building'])+
+    '<button type="button" class="tab" data-action="open-menu" aria-haspopup="dialog"'+(ui.tab==='tipos'?' aria-current="page"':'')+'><span class="pill">'+ic('menu')+'</span>Menu</button>';
 }
 export function renderView(){
   let h='';
