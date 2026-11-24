@@ -1,10 +1,13 @@
 /* Cuidar em Casa: ponto de entrada. Os modulos de src/ guardam o que nao depende de tela nem de estado (v17). */
 import {SHORT,LONG,LIM} from './src/core/limits.js';
 import {pad,iso,fromIso,addDays,startOfWeek,WD,WDL,MON,nowKey,age,isoToBr,brToIso} from './src/core/dates.js';
-import {esc,norm,initials,hashN,cleanName} from './src/core/text.js';
-import {BRL,parseMoney,brl} from './src/core/money.js';
+import {esc,norm,initials,hashN,cleanName,pl} from './src/core/text.js';
+import {BRL,parseMoney} from './src/core/money.js';
 import {uid,isUuid,hashUuid} from './src/core/ids.js';
 import {okDate,normalize} from './src/domain/validation.js';
+import * as Q from './src/domain/queries.js';
+import * as Rec from './src/domain/recurrence.js';
+import * as Bill from './src/domain/billing.js';
 /* ---------- utilidades ---------- */
 const $=(s,r)=>(r||document).querySelector(s);
 const ic=n=>'<svg class="i" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
@@ -598,18 +601,17 @@ function planImport(o){
   r.nada=!r.companies.length&&!r.patients.length&&!r.visits.length&&!r.tipoNovos.length;
   return r;
 }
-const plural=(n,um,varios)=>n+' '+(n===1?um:varios);
 function openImport(p){
   pendingImport=p.nada?null:p;
   let b;
-  if(p.nada) b='<p>Nada novo neste arquivo: tudo o que ele tem já está no app.</p>'+(p.semPaciente?'<p class="hint">'+plural(p.semPaciente,'atendimento foi ignorado porque o paciente dele não está no arquivo.','atendimentos foram ignorados porque o paciente deles não está no arquivo.')+'</p>':'')+
+  if(p.nada) b='<p>Nada novo neste arquivo: tudo o que ele tem já está no app.</p>'+(p.semPaciente?'<p class="hint">'+pl(p.semPaciente,'atendimento foi ignorado porque o paciente dele não está no arquivo.','atendimentos foram ignorados porque o paciente deles não está no arquivo.')+'</p>':'')+
     '<div class="sheet-actions"><button type="button" class="btn primary" data-action="close-sheet">Fechar</button></div>';
   else{
-    let li='<li>Serão adicionados: <strong>'+plural(p.companies.length,'empresa','empresas')+'</strong>, <strong>'+plural(p.patients.length,'paciente','pacientes')+'</strong> e <strong>'+plural(p.visits.length,'atendimento','atendimentos')+'</strong>.</li>';
-    if(p.tipoNovos.length) li+='<li>'+plural(p.tipoNovos.length,'tipo de atendimento novo.','tipos de atendimento novos.')+'</li>';
-    if(p.jaTinha) li+='<li>'+plural(p.jaTinha,'item já existe no app e fica como está.','itens já existem no app e ficam como estão.')+'</li>';
-    if(p.semEmpresa) li+='<li>'+plural(p.semEmpresa,'paciente estava ligado a uma empresa que não está no arquivo e entra como particular.','pacientes estavam ligados a uma empresa que não está no arquivo e entram como particulares.')+'</li>';
-    if(p.semPaciente) li+='<li>'+plural(p.semPaciente,'atendimento será descartado porque o paciente dele não está no arquivo.','atendimentos serão descartados porque o paciente deles não está no arquivo.')+'</li>';
+    let li='<li>Serão adicionados: <strong>'+pl(p.companies.length,'empresa','empresas')+'</strong>, <strong>'+pl(p.patients.length,'paciente','pacientes')+'</strong> e <strong>'+pl(p.visits.length,'atendimento','atendimentos')+'</strong>.</li>';
+    if(p.tipoNovos.length) li+='<li>'+pl(p.tipoNovos.length,'tipo de atendimento novo.','tipos de atendimento novos.')+'</li>';
+    if(p.jaTinha) li+='<li>'+pl(p.jaTinha,'item já existe no app e fica como está.','itens já existem no app e ficam como estão.')+'</li>';
+    if(p.semEmpresa) li+='<li>'+pl(p.semEmpresa,'paciente estava ligado a uma empresa que não está no arquivo e entra como particular.','pacientes estavam ligados a uma empresa que não está no arquivo e entram como particulares.')+'</li>';
+    if(p.semPaciente) li+='<li>'+pl(p.semPaciente,'atendimento será descartado porque o paciente dele não está no arquivo.','atendimentos serão descartados porque o paciente deles não está no arquivo.')+'</li>';
     if(hasExamples()) li+='<li>Os dados de exemplo serão apagados.</li>';
     b=(p.data?'<p>Backup de '+esc(isoToBr(p.data))+'.</p>':'')+'<ul class="imp-sum">'+li+'</ul><p class="hint">Seus dados atuais não são alterados nem apagados.</p>'+
       '<div class="sheet-actions"><button type="button" class="btn primary" data-action="import-confirm">Restaurar</button><button type="button" class="btn ghost" data-action="close-sheet">Cancelar</button></div>';
@@ -625,7 +627,7 @@ function applyImport(){
   if(p.tipoNovos.length){ensureTipos();S.tipos=S.tipos.concat(p.tipoNovos).slice(0,200);}
   if(ui.fcomp!=='all'&&ui.fcomp!=='none'&&!findCompany(ui.fcomp)) ui.fcomp='all';
   commit();closeSheet();renderAll();
-  toast('Backup restaurado: '+plural(p.patients.length,'paciente','pacientes')+' e '+plural(p.visits.length,'atendimento','atendimentos')+'.');
+  toast('Backup restaurado: '+pl(p.patients.length,'paciente','pacientes')+' e '+pl(p.visits.length,'atendimento','atendimentos')+'.');
 }
 function readBackupFile(file){
   if(!file) return;
@@ -642,43 +644,12 @@ function readBackupFile(file){
    Valor de cada atendimento = valor cadastrado no paciente. Feito = realizado. Agendado = previsto.
    Cancelados não entram. Atendimentos recorrentes ainda não registrados contam como agendados. */
 let dlRef={save:function(o){dlFile(o.filename,o.data,'text/csv');return Promise.resolve();}};
-const pl=(n,a,b)=>n+' '+(n===1?a:b);
 const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
-function monthRange(y,m){const a=new Date(y,m,1),b=new Date(y,m+1,0);return {y:a.getFullYear(),m:a.getMonth(),from:iso(a),to:iso(b)};}
 function repInit(o){
   const n=new Date(),r=monthRange(n.getFullYear(),n.getMonth());
   ui.rep={by:o.by==='empresa'?'empresa':'paciente',emp:o.emp||'all',pac:o.pac||'all',mode:'mes',y:r.y,m:r.m,from:r.from,to:r.to};
 }
 function repSetMonth(y,m){const r=monthRange(y,m);ui.rep.y=r.y;ui.rep.m=r.m;ui.rep.from=r.from;ui.rep.to=r.to;}
-const noCompany=p=>!p.empresaId||!findCompany(p.empresaId);
-function repData(){
-  const r=ui.rep,rows=Object.create(null);
-  const tot={feitos:0,ag:0,real:0,prev:0,pacs:Object.create(null)};
-  let semValor=0,pend=0;
-  const now=nowKey();
-  visitsBetween(r.from,r.to).forEach(function(v){
-    if(v.status==='cancelado') return;
-    const p=findPatient(v.pacienteId);if(!p) return;
-    if(r.emp==='none'){if(!noCompany(p)) return;}
-    else if(r.emp!=='all'&&p.empresaId!==r.emp) return;
-    if(r.pac!=='all'&&p.id!==r.pac) return;
-    const comp=noCompany(p)?null:findCompany(p.empresaId);
-    const key=r.by==='empresa'?(comp?comp.id:'none'):p.id;
-    const row=rows[key]||(rows[key]={key:key,nome:r.by==='empresa'?(comp?comp.nome:'Particulares'):p.nome,empresa:comp?comp.nome:'Particular',valor:(p.valor==null||p.valor==='')?null:pValue(p),feitos:0,ag:0,real:0,prev:0,pacs:Object.create(null)});
-    const val=pValue(p),sem=(p.valor==null||p.valor==='');
-    if(sem) semValor++;
-    row.pacs[p.id]=1;tot.pacs[p.id]=1;
-    if(v.status==='feito'){row.feitos++;row.real+=val;tot.feitos++;tot.real+=val;}
-    else{row.ag++;row.prev+=val;tot.ag++;tot.prev+=val;if((v.date+' '+(v.hora||'00:00'))<now) pend++;}
-  });
-  const list=Object.keys(rows).map(k=>rows[k]).sort(function(a,b){
-    if(a.key==='none') return 1;if(b.key==='none') return -1;
-    return a.nome.localeCompare(b.nome,'pt-BR');
-  });
-  return {rows:list,tot:tot,semValor:semValor,pend:pend};
-}
-function repEmpLabel(){const r=ui.rep;if(r.emp==='all') return 'Todas';if(r.emp==='none') return 'Particulares';const c=findCompany(r.emp);return c?c.nome:'Todas';}
-function repPacLabel(){const r=ui.rep;if(r.pac==='all') return 'Todos';const p=findPatient(r.pac);return p?p.nome:'Todos';}
 function openReport(){
   openSheet('Faturamento','<div id="rep-root"></div>');
   repRender();
@@ -721,35 +692,6 @@ function repRender(focusId){
   root.innerHTML=h;
   if(sc) sc.scrollTop=y;
   if(focusId){const e=document.getElementById(focusId);if(e) try{e.focus({preventScroll:true});}catch(x){}}
-}
-const csvCell=v=>{let t=String(v==null?'':v);if(/^[=+\-@\t\r]/.test(t)) t="'"+t;return /[;"\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
-const csvNum=v=>(Math.round(Number(v)*100)/100).toFixed(2).replace('.',',');
-function repCsv(){
-  const r=ui.rep,d=repData(),L=[];
-  L.push(['Relatório de faturamento']);
-  L.push(['Período',isoToBr(r.from)+' a '+isoToBr(r.to)]);
-  L.push(['Agrupado por',r.by==='empresa'?'Empresa':'Paciente']);
-  L.push(['Empresa',repEmpLabel()]);
-  L.push(['Paciente',repPacLabel()]);
-  L.push(['Gerado em',isoToBr(iso(new Date()))+' '+nowKey().slice(11)]);
-  L.push([]);
-  if(r.by==='empresa'){
-    L.push(['Empresa','Pacientes atendidos','Atendimentos feitos','Valor realizado','Atendimentos agendados','Valor previsto']);
-    d.rows.forEach(x=>L.push([x.nome,Object.keys(x.pacs).length,x.feitos,csvNum(x.real),x.ag,csvNum(x.prev)]));
-    L.push(['Total',Object.keys(d.tot.pacs).length,d.tot.feitos,csvNum(d.tot.real),d.tot.ag,csvNum(d.tot.prev)]);
-  }else{
-    L.push(['Paciente','Empresa','Atendimentos feitos','Valor por atendimento','Valor realizado','Atendimentos agendados','Valor previsto']);
-    d.rows.forEach(x=>L.push([x.nome,x.empresa,x.feitos,x.valor==null?'':csvNum(x.valor),csvNum(x.real),x.ag,csvNum(x.prev)]));
-    L.push(['Total','',d.tot.feitos,'',csvNum(d.tot.real),d.tot.ag,csvNum(d.tot.prev)]);
-  }
-  return '\ufeff'+L.map(a=>a.map(csvCell).join(';')).join('\r\n');
-}
-function repText(){
-  const r=ui.rep,d=repData();
-  const line=(n,f,re,a,pr)=>n+': '+pl(f,'feito','feitos')+' ('+brl(re)+'), '+pl(a,'agendado','agendados')+' ('+brl(pr)+' previsto)';
-  return ['Faturamento de '+isoToBr(r.from)+' a '+isoToBr(r.to)+' (por '+r.by+')']
-    .concat(d.rows.map(x=>line(x.nome,x.feitos,x.real,x.ag,x.prev)))
-    .concat([line('Total',d.tot.feitos,d.tot.real,d.tot.ag,d.tot.prev)]).join('\n');
 }
 
 /* ---------- conta e acesso ----------
@@ -978,10 +920,20 @@ async function doSenha(f){
   }catch(e){setBusy(f,false);fail(f,errMsg(e,'Não foi possível alterar a senha. Tente de novo.'),'senha');}
 }
 
-/* ---------- consultas ---------- */
-const findPatient=id=>S.patients.find(p=>p.id===id);
-const findCompany=id=>S.companies.find(c=>c.id===id);
-const pValue=p=>{const n=p?Number(p.valor):0;return isFinite(n)?n:0;};
+/* Consultas e regras ficam em src/domain/ (v17). Aqui só ligam ao estado da tela: S (dados) e ui (filtros). */
+function findPatient(id){return Q.findPatient(S,id);}
+function findCompany(id){return Q.findCompany(S,id);}
+function noCompany(p){return Q.noCompany(S,p);}
+function visitsBetween(a,b){return Rec.visitsBetween(S,a,b);}
+function visitById(id){return Rec.visitById(S,id);}
+function resolveVisit(id){return Rec.resolveVisit(S,id);}
+function recSig(r){return Rec.recSig(r);}
+function closeRecurrence(p){return Rec.closeRecurrence(S,p);}
+function recText(p){return Rec.recText(p);}
+function monthRange(y,m){return Bill.monthRange(y,m);}
+function repData(){return Bill.repData(S,ui.rep);}
+function repCsv(){return Bill.repCsv(S,ui.rep);}
+function repText(){return Bill.repText(S,ui.rep);}
 const hasExamples=()=>S.patients.some(x=>x.ex)||S.companies.some(x=>x.ex)||S.visits.some(x=>x.ex);
 function money(v){
   if(hide) return '<span class="money" aria-label="Valor oculto">R$ ••••</span>';
@@ -1039,66 +991,6 @@ function tipoOptions(sel){
 function tipoField(id,name,value){
   return '<div class="tipof"><select id="'+id+'" name="'+name+'" data-kind="tipo">'+tipoOptions(value)+'</select>'+
     '<div class="tipo-new" hidden><label for="'+id+'-novo">Nome do novo tipo</label><div class="datef-row"><input id="'+id+'-novo" data-role="tipo-new" type="text" maxlength="'+LIM.tipo+'" autocomplete="off" placeholder="Ex.: Troca de sonda"><button type="button" class="btn" data-action="tipo-add">Adicionar</button></div></div></div>';
-}
-/* Atendimentos recorrentes não são gravados um a um: aparecem na agenda a partir do cadastro do paciente.
-   Só viram registro quando você conclui, edita, cancela ou exclui um deles. */
-function recOccurs(p,date){
-  const r=p&&p.rec;
-  if(!r||!r.ativo||!Array.isArray(r.dias)) return false;
-  if(r.dias.indexOf(fromIso(date).getDay())<0) return false;
-  if(date<r.inicio||(r.fim&&date>r.fim)) return false;
-  if((p.recExc||[]).indexOf(date)>-1) return false;
-  return !S.visits.some(v=>v.serie===p.id&&v.serieData===date);
-}
-function virtualOf(p,date){
-  return {id:'r-'+p.id+'-'+date,pacienteId:p.id,date:date,hora:p.rec.hora,tipo:p.rec.tipo||'',obs:'',status:'agendado',serie:p.id,serieData:date,virtual:true};
-}
-function visitsBetween(a,b){
-  const out=S.visits.filter(v=>v.date>=a&&v.date<=b);
-  const pats=S.patients.filter(p=>p.rec&&p.rec.ativo);
-  if(pats.length){
-    for(let d=fromIso(a),end=fromIso(b);d<=end;d=addDays(d,1)){
-      const k=iso(d);
-      pats.forEach(function(p){if(recOccurs(p,k)) out.push(virtualOf(p,k));});
-    }
-  }
-  return out;
-}
-function visitById(id){
-  const st=S.visits.find(x=>x.id===id);
-  if(st) return st;
-  if(String(id).indexOf('r-')===0){
-    const p=findPatient(id.slice(2,-11)),date=id.slice(-10);
-    if(p&&recOccurs(p,date)) return virtualOf(p,date);
-  }
-  return null;
-}
-function resolveVisit(id){
-  const v=visitById(id);
-  if(!v) return null;
-  if(v.virtual){const m=Object.assign({},v);delete m.virtual;S.visits.push(m);return m;}
-  return v;
-}
-function recSig(r){return r&&r.ativo?[r.dias.join(','),r.hora,r.tipo||'',r.inicio,r.fim||''].join('|'):'';}
-/* Antes de trocar a regra: o passado recente fica como estava e o futuro volta a seguir a regra nova.
-   Atendimentos que você mexeu à mão (remarcou, editou) ou já concluiu/cancelou são mantidos. */
-function closeRecurrence(p){
-  const today=iso(new Date()),floor=addDays(new Date(),-120),from=fromIso(p.rec.inicio);
-  for(let d=from<floor?floor:from;iso(d)<today;d=addDays(d,1)){
-    const k=iso(d);
-    if(recOccurs(p,k)) resolveVisit('r-'+p.id+'-'+k);
-  }
-  S.visits=S.visits.filter(v=>!(v.serie===p.id&&v.status==='agendado'&&!v.manual&&v.date>=today));
-  p.recExc=(p.recExc||[]).filter(x=>x<today);
-}
-function recText(p){
-  const r=p.rec;
-  if(!r||!r.ativo) return '';
-  const nomes=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
-  const ds=r.dias.slice().sort((a,b)=>((a+6)%7)-((b+6)%7)).map(d=>nomes[d]);
-  const lista=ds.length>1?ds.slice(0,-1).join(', ')+' e '+ds[ds.length-1]:ds[0];
-  const fmt=x=>x.split('-').reverse().join('/');
-  return 'Toda semana: '+lista+', às '+r.hora+(r.fim?'. Até '+fmt(r.fim)+'.':'.');
 }
 
 /* ---------- telas ---------- */

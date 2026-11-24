@@ -10,3 +10,4 @@ export function initials(n){
 }
 export function hashN(s){let h=0;for(const ch of String(s)) h=(h*31+ch.charCodeAt(0))>>>0;return h;}
 export const cleanName=n=>String(n||'').trim().replace(/\s+/g,' ');
+export const pl=(n,a,b)=>n+' '+(n===1?a:b);

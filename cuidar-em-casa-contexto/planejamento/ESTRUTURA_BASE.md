@@ -62,7 +62,7 @@ O arquivo já está dividido em blocos comentados. Este é o mapa para quem for 
 **Pontos frágeis para quem refatorar:**
 - Estado global mutável (`S`, `ui`, `auth`, `hide`) acessado de todos os blocos.
 - Telas re-renderizadas por `innerHTML` inteiro: perde foco e rolagem (o relatório já compensa à mão).
-- A regra de recorrência (BACKEND §5.1) está espalhada em 6 funções e é a parte mais arriscada de mudar.
+- A regra de recorrência (BACKEND §5.1) é a parte mais arriscada de mudar. **Desde a v17 parte 2 vive em `site/src/domain/recurrence.js`** (era 8 funções espalhadas no `app.js`), com 17 testes unitários de regra.
 - Id da ocorrência virtual (`r-{pacienteId}-{data}`) é decodificado por posição (`slice(2,-11)`): funciona com uuid, mas qualquer mudança de formato quebra.
 - Gravação e camada de dados (`commit`/`flush`/`initDb`) estão acopladas ao `window.claude`. Trocar por Supabase hoje exige mexer no meio do arquivo.
 
@@ -241,6 +241,7 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 
 | Data | Mudança |
 |---|---|
+| 24/11/2026 | (Claude Code) **v17 parte 2** (sem mudar comportamento): `domain/queries.js`, `domain/recurrence.js` e `domain/billing.js` extraídos do `app.js` (1829 → 1721 linhas). As funções passam a receber o estado (`S`) e o "agora" como argumento; no `app.js` ficam *wrappers* finos que só ligam ao `S` e ao `ui`, então nenhum ponto de chamada mudou. `nowKey` aceita data opcional; `pl` foi para `core/text.js` (o `plural` duplicado do backup saiu). Testes: +36 unitários (`recurrence.test.mjs`, `billing.test.mjs`; total 80), escritos antes do código e conferidos por mutação (as 17 mutações reais derrubam teste; o único sobrevivente é equivalente). Verificação extra, não commitada: 600 estados aleatórios, 65 593 comparações entre o código de `afc427a` e o novo, 0 diferenças (controle com o antigo estragado: 544). Falta: `data/` e `ui/` (partes 3 e 4). |
 | 23/11/2026 | (Claude Code) **v17 parte 1** (só reorganização, sem mudar comportamento): `app.js` vira módulo ES (`<script type="module">`) e perde 1 camada (IIFE); nascem `site/src/core/{limits,dates,text,money,ids}.js` e `site/src/domain/validation.js`, recortados sem reescrever. Testes: 44 unitários (`testes/unit`, `node --test`, conferidos por mutação) + 101 de navegador, todos passando; `testes/lint.sh` (ESLint `no-undef`) pega import esquecido. Achados E6 e E7 na seção 3.3. Próximas partes: recurrence+billing, data, ui. |
 | 23/11/2026 19:10 | (Claude Code) Deploy automático **voltou** (usuário reconectou o Git na Vercel; o merge do PR #8 gerou deploy sozinho). A correção de 18:30 abaixo vale só para o período PR #2 a #7. |
 | 23/11/2026 18:30 | (Claude Code) v16 publicada em produção por redeploy manual. **Correção:** a frase "deploy automático a cada merge na `main`" (seções 2 e histórico de 18/11) não se confirmou; ver `LEIA-ME_HANDOFF.md`. |
