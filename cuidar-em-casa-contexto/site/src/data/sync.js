@@ -2,7 +2,7 @@
    snap = foto do que o banco já tem (Map por tabela, valores em JSON); só o que mudou desde a foto é enviado. */
 import {T_ORDER,T_CONFLICT,desiredRows,profRow} from './rows.js';
 
-export const emptySnap=()=>({companies:new Map(),patients:new Map(),visits:new Map(),recurrences:new Map(),recurrence_exceptions:new Map(),service_types:new Map(),perfil:''});
+export const emptySnap=()=>{const snap={};T_ORDER.forEach(function(t){snap[t]=new Map();});snap.perfil='';return snap;};
 /* Foto do que as linhas desejadas (D) e o perfil (profRow) representam. */
 export function snapshotOf(D,perfilRow){
   const snap=emptySnap();

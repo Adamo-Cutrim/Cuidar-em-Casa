@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {emptySnap, snapshotOf, planSync, sendDeletes, sendUpserts, pushAll} from '../../../site/src/data/sync.js';
 import {T_ORDER, desiredRows, profRow} from '../../../site/src/data/rows.js';
 import {hashUuid} from '../../../site/src/core/ids.js';
+import {renameTipoNoEstado} from '../../../site/src/domain/tipos.js';
 
 const USER = 'bbbbbbbb-1111-4111-8111-000000000001';
 const U = n => 'aaaaaaaa-0000-4000-8000-' + String(n).padStart(12, '0');
@@ -48,11 +49,11 @@ test('planSync: novo, alterado, removido e igual', () => {
 test('pushAll: primeira gravacao envia perfil e depois cada tabela, pais antes de filhos', async () => {
   const api = fakeApi(), s = estado(), snap = emptySnap();
   await pushAll(api, USER, s, snap, new Map());
-  assert.deepEqual(resumo(api.calls), ['POST profiles?on_conflict=user_id', 'POST companies?on_conflict=id', 'POST patients?on_conflict=id', 'POST visits?on_conflict=id', 'POST recurrences?on_conflict=patient_id',
-    'POST recurrence_exceptions?on_conflict=patient_id,data', 'POST service_types?on_conflict=id']);
+  assert.deepEqual(resumo(api.calls), ['POST profiles?on_conflict=user_id', 'POST companies?on_conflict=id', 'POST patients?on_conflict=id', 'POST service_types?on_conflict=id', 'POST visits?on_conflict=id', 'POST recurrences?on_conflict=patient_id',
+    'POST recurrence_exceptions?on_conflict=patient_id,data']);   // v18b: o tipo antes de quem o usa
   assert.ok(api.calls.every(c => c.prefer === 'resolution=merge-duplicates,return=minimal'));
   assert.deepEqual(api.calls[0].body, {user_id: USER, ...profRow(s.perfil)});
-  assert.equal(api.calls[2].body.length, 2); assert.equal(api.calls[5].body.length, 2);
+  assert.equal(api.calls[2].body.length, 2); assert.equal(api.calls[6].body.length, 2);
   assert.deepEqual(snap.patients.size, 2); assert.equal(snap.perfil, JSON.stringify(profRow(s.perfil)));
 });
 
@@ -118,7 +119,7 @@ test('pushAll: envia em lotes (upsert 200, delete 100)', async () => {
 
 test('pushAll: falha no meio mantem o snapshot do que ja foi; a proxima tentativa envia so o resto', async () => {
   const s = estado(); s.visits = Array.from({length: 450}, (_, i) => ({id: U(1000 + i), pacienteId: U(11), date: '2026-11-10', hora: '08:00', tipo: '', obs: '', status: 'agendado'}));
-  const snap = emptySnap(), api = fakeApi(5);                // 1 perfil, 2 companies, 3 patients, 4 visits(1o lote), 5 visits(2o lote) falha
+  const snap = emptySnap(), api = fakeApi(6);                // 1 perfil, 2 companies, 3 patients, 4 service_types, 5 visits(1o lote), 6 visits(2o lote) falha
   await assert.rejects(pushAll(api, USER, s, snap, new Map()), {status: 503});
   assert.equal(snap.visits.size, 200);                        // so o primeiro lote entrou no snapshot
   assert.equal(snap.companies.size, 1); assert.equal(snap.perfil, JSON.stringify(profRow(s.perfil)));
@@ -144,4 +145,24 @@ test('pushAll: tipos de atendimento reaproveitam os ids que ja existem', async (
 test('pushAll: nao altera o estado', async () => {
   const s = estado(), antes = JSON.stringify(s); await pushAll(fakeApi(), USER, s, emptySnap(), new Map());
   assert.equal(JSON.stringify(s), antes);
+});
+
+test('v18b: tipo novo e atendimento que o usa, no mesmo envio: o tipo vai primeiro (senao o banco recusa a ligacao)', async () => {
+  const s = estado(), snap = emptySnap(), api = fakeApi();
+  await pushAll(api, USER, s, snap, new Map()); api.calls.length = 0;
+  s.tipos.push('Troca de sonda'); s.visits[0].tipo = 'Troca de sonda';
+  await pushAll(api, USER, s, snap, new Map());
+  assert.deepEqual(resumo(api.calls), ['POST service_types?on_conflict=id', 'POST visits?on_conflict=id']);
+  const idTipo = api.calls[0].body[0].id; assert.equal(api.calls[0].body[0].nome, 'Troca de sonda'); assert.equal(api.calls[1].body[0].service_type_id, idTipo);
+});
+
+test('v18b: renomear um tipo envia so a linha do tipo e os atendimentos cujo nome mudou, sem trocar o id', async () => {
+  const s = estado(), snap = emptySnap(), api = fakeApi(), ids = new Map();
+  s.visits[0].tipo = 'Curativo'; s.visits[1].tipo = '';
+  await pushAll(api, USER, s, snap, ids); api.calls.length = 0;
+  renameTipoNoEstado(s, ids, USER, 'Curativo', 'Curativo simples');
+  await pushAll(api, USER, s, snap, ids);
+  assert.deepEqual(resumo(api.calls), ['POST service_types?on_conflict=id', 'POST visits?on_conflict=id']);       // nada apagado: o tipo e atualizado no lugar
+  assert.equal(api.calls[0].body[0].nome, 'Curativo simples'); assert.equal(api.calls[1].body.length, 1);
+  assert.equal(api.calls[1].body[0].service_type_id, api.calls[0].body[0].id);
 });
