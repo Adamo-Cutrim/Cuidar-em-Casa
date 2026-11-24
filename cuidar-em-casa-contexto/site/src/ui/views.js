@@ -93,7 +93,7 @@ function viewPacientes(){
       st.S.companies.map(c=>'<button type="button" class="fchip'+(ui.fcomp===c.id?' sel':'')+'" data-action="filter" data-id="'+c.id+'">'+esc(c.nome)+'</button>').join('')+
       '<button type="button" class="fchip'+(ui.fcomp==='none'?' sel':'')+'" data-action="filter" data-id="none">Particulares</button></div>';
   }
-  return '<div class="search">'+ic('search')+'<label for="q" class="sr">Buscar paciente</label><input id="q" type="search" placeholder="Buscar por nome, bairro ou empresa" value="'+esc(ui.q)+'" autocomplete="off"></div>'+f+'<div id="plist"></div>';
+  return '<div class="search">'+ic('search')+'<label for="q" class="sr">Buscar paciente</label><input id="q" type="search" placeholder="Nome, bairro ou empresa" value="'+esc(ui.q)+'" autocomplete="off"></div>'+f+'<div id="plist"></div>';
 }
 export function renderPatientList(){
   const el=$('#plist');if(!el) return;
