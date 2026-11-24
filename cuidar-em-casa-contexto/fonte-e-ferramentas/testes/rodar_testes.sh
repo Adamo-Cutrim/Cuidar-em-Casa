@@ -9,6 +9,12 @@ AQUI_PY="$(cd "$AQUI" && (pwd -W 2>/dev/null || pwd))"
 # No Windows o comando python3 costuma ser um atalho da Microsoft Store que não roda; testa de verdade.
 PY=python3; python3 -c '' 2>/dev/null || PY=python
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1
+# Testes unitarios (Node): modulos de site/src, sem navegador. Rapidos, por isso vao primeiro.
+if command -v node >/dev/null 2>&1; then
+  node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test "$AQUI_PY/unit/"
+else
+  echo "(node nao encontrado: testes unitarios pulados)"
+fi
 TMP_ABS="${TMPDIR:-${TEMP:-/tmp}}"
 export SITE_DIR="$AQUI_PY/site_test" SHOT_DIR="${SHOT_DIR:-$TMP_ABS/}"
 rm -rf "$AQUI/site_test"; cp -r "$AQUI/../../site" "$AQUI/site_test"
