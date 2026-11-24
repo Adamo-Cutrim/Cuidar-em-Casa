@@ -124,10 +124,25 @@ test('dinheiro: parseMoney (formato brasileiro)', () => {
   assert.ok(Number.isNaN(parseMoney('1,2,3')));    // virgula repetida: invalido
 });
 
-test('dinheiro: parseMoney, comportamentos atuais que merecem atencao (registrados, nao corrigidos na v17)', () => {
-  assert.equal(parseMoney('1.5'), 1.5);   // sem virgula, o ponto e decimal
-  assert.equal(parseMoney('1.234'), 1.23); // quem digita "1.234" querendo mil duzentos e trinta e quatro recebe 1,23
-  assert.equal(parseMoney('-5'), 5);       // o sinal de menos e descartado
+test('E6 corrigido: ponto de milhar sem virgula (como se escreve no Brasil)', () => {
+  assert.equal(parseMoney('1.234'), 1234);           // antes: 1,23
+  assert.equal(parseMoney('1.500'), 1500);
+  assert.equal(parseMoney('12.345.678'), 12345678);
+  assert.equal(parseMoney('R$ 2.000'), 2000);
+  assert.equal(parseMoney(' 1.234 '), 1234);
+});
+
+test('E6: ponto com 1 ou 2 casas (ou que nao forma milhar) continua decimal', () => {
+  assert.equal(parseMoney('1.5'), 1.5); assert.equal(parseMoney('150.75'), 150.75); assert.equal(parseMoney('0.500'), 0.5);
+  assert.equal(parseMoney('1.2345'), 1.23);          // 4 casas: decimal arredondado, como antes
+  assert.equal(parseMoney('1234.5'), 1234.5);        // 4 digitos antes do ponto: nao e milhar
+  assert.ok(Number.isNaN(parseMoney('1.234.5')));    // mistura invalida
+});
+
+test('E6: valor negativo ou grande demais pede um valor valido', () => {
+  for (const v of ['-5', '-5,00', 'R$ -150', '5-']) assert.ok(Number.isNaN(parseMoney(v)), v);   // antes: o sinal era descartado e gravava 5
+  assert.ok(Number.isNaN(parseMoney('1.000.000.000'))); assert.ok(Number.isNaN(parseMoney('1000000000')));   // mesmo limite de numOrNull (< 1e9)
+  assert.equal(parseMoney('999.999.999,99'), 999999999.99);
 });
 
 test('dinheiro: numOrNull', () => {
