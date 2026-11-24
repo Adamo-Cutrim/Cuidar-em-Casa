@@ -10,6 +10,7 @@ import * as Rec from './src/domain/recurrence.js';
 import * as Bill from './src/domain/billing.js';
 import {dbId as rowDbId,tipoKey,desiredRows,profRow,rowsToRaw} from './src/data/rows.js';
 import {emptySnap,snapshotOf,pushAll as syncPush} from './src/data/sync.js';
+import {createClient,errMsg,readHashSession,nowSec} from './src/data/supabase.js';
 /* ---------- utilidades ---------- */
 const $=(s,r)=>(r||document).querySelector(s);
 const ic=n=>'<svg class="i" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
@@ -212,122 +213,19 @@ function statusText(){
   return 'Dados privados, salvos na sua conta.';
 }
 
-/* ---------- conexão com o Supabase ----------
-   Cliente próprio, só com fetch: nenhum código de terceiros roda nesta página.
-   A chave abaixo é a chave PÚBLICA do projeto. Quem protege os dados é o banco (RLS):
-   cada linha só pode ser lida e alterada pelo usuário dono dela. */
-let ses=null, refreshing=null;
-const nowSec=()=>Math.floor(Date.now()/1000);
-function readSes(){
-  const list=[[sessionStorage,false],[localStorage,true]];
-  for(let i=0;i<list.length;i++){
-    try{
-      const o=JSON.parse(list[i][0].getItem(SB_SES)||'null');
-      if(o&&typeof o.access_token==='string'&&typeof o.refresh_token==='string'&&o.user&&typeof o.user.id==='string'){o.persist=list[i][1];return o;}
-    }catch(e){}
-  }
-  return null;
-}
-function storeSes(d,persist){
-  const u=d.user||(ses?{id:ses.user.id,email:ses.user.email,user_metadata:{nome:ses.user.nome}}:null);
-  if(!u||typeof d.access_token!=='string') throw {code:'bad_session'};
-  const md=(u.user_metadata&&typeof u.user_metadata==='object')?u.user_metadata:{};
-  ses={access_token:d.access_token,refresh_token:String(d.refresh_token||''),expires_at:Number(d.expires_at)||(nowSec()+(Number(d.expires_in)||3600)),
-    user:{id:String(u.id||''),email:String(u.email||'').slice(0,200),nome:typeof md.nome==='string'?md.nome.slice(0,80):''},persist:!!persist};
-  try{
-    (persist?localStorage:sessionStorage).setItem(SB_SES,JSON.stringify(ses));
-    (persist?sessionStorage:localStorage).removeItem(SB_SES);
-  }catch(e){}
-}
-function clearSes(){
-  ses=null;
-  try{sessionStorage.removeItem(SB_SES);}catch(e){}
-  try{localStorage.removeItem(SB_SES);}catch(e){}
-}
-async function api(path,o){
-  o=o||{};
-  const useAuth=o.auth!==false;
-  if(useAuth){
-    if(!ses) throw {code:'expired'};
-    if(ses.expires_at-nowSec()<60) await refreshSes();
-  }
-  const h={apikey:SB_KEY};
-  if(o.body!==undefined) h['Content-Type']='application/json';
-  if(useAuth) h.Authorization='Bearer '+ses.access_token;
-  if(o.prefer) h.Prefer=o.prefer;
-  let r,t;
-  try{
-    r=await fetch(SB_URL+path,{method:o.method||'GET',headers:h,body:o.body===undefined?undefined:JSON.stringify(o.body),cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer'});
-    t=await r.text();
-  }catch(e){throw {code:'network'};}
-  let d=null;
-  if(t){try{d=JSON.parse(t);}catch(e){}}
-  if(r.status===401&&useAuth&&!o.again){
-    await refreshSes();
-    return api(path,Object.assign({},o,{again:true}));
-  }
-  if(!r.ok) throw {code:'http',status:r.status,data:d};
-  return d;
-}
-function refreshSes(){
-  if(!ses) return Promise.reject({code:'expired'});
-  if(refreshing) return refreshing;
-  refreshing=(async function(){
-    try{
-      const d=await api('/auth/v1/token?grant_type=refresh_token',{method:'POST',auth:false,body:{refresh_token:ses.refresh_token}});
-      storeSes(d,ses.persist);
-    }catch(e){
-      if(e&&e.code==='http'&&(e.status===400||e.status===401||e.status===403)){clearSes();throw {code:'expired'};}
-      throw e;
-    }finally{refreshing=null;}
-  })();
-  return refreshing;
-}
-const SB_ERR={
-  invalid_credentials:'E-mail ou senha incorretos.',
-  email_not_confirmed:'Confirme seu e-mail pelo link que enviamos antes de entrar.',
-  weak_password:'Essa senha é fraca demais. Use uma senha mais longa e menos comum.',
-  over_request_rate_limit:'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
-  over_email_send_rate_limit:'Muitos e-mails enviados. Aguarde alguns minutos e tente de novo.',
-  signup_disabled:'Novos cadastros estão desativados.',
-  same_password:'A nova senha precisa ser diferente da atual.',
-  user_banned:'Esta conta está bloqueada.'
-};
-function errMsg(e,fallback){
-  if(e&&e.code==='network') return 'Sem conexão com a internet. Verifique a rede e tente de novo.';
-  if(e&&e.code==='http'){
-    const d=(e.data&&typeof e.data==='object')?e.data:{};
-    let c=typeof d.error_code==='string'?d.error_code:'';
-    if(!c&&/invalid login credentials/i.test(String(d.error_description||d.msg||''))) c='invalid_credentials';
-    if(SB_ERR[c]) return SB_ERR[c];
-    if(e.status===429) return SB_ERR.over_request_rate_limit;
-    if(e.status>=500) return 'O servidor está indisponível no momento. Tente de novo em instantes.';
-  }
-  return fallback;
-}
-async function sbSignIn(email,pw,persist){
-  const d=await api('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email:email,password:pw}});
-  storeSes(d,persist);
-}
-async function sbSignUp(nome,email,pw,persist){
-  const d=await api('/auth/v1/signup',{method:'POST',auth:false,body:{email:email,password:pw,data:{nome:nome}}});
-  if(d&&typeof d.access_token==='string'){storeSes(d,persist);return true;}
-  return false;
-}
-function readHashSession(){
-  const h=location.hash.replace(/^#/,'');
-  if(!h) return null;
-  const p=new URLSearchParams(h);
-  if(!p.has('access_token')&&!p.has('error')) return null;
-  try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
-  if(p.has('error')) return {error:String(p.get('error_description')||p.get('error')).slice(0,200)};
-  return {access_token:p.get('access_token'),refresh_token:p.get('refresh_token')||'',expires_in:p.get('expires_in'),expires_at:p.get('expires_at'),type:p.get('type')};
-}
+/* Cliente do Supabase em src/data/supabase.js (v17). A sessão mora dentro dele: SB.ses (leitura) e SB.setSession(...) (troca). */
+const SB=createClient({url:SB_URL,key:SB_KEY,sesKey:SB_SES,fetchFn:function(u,o){return fetch(u,o);},storage:{session:function(){return sessionStorage;},local:function(){return localStorage;}}});
+function api(path,o){return SB.api(path,o);}
+function readSes(){return SB.readSes();}
+function storeSes(d,persist){return SB.storeSes(d,persist);}
+function clearSes(){return SB.clearSes();}
+function sbSignIn(email,pw,persist){return SB.sbSignIn(email,pw,persist);}
+function sbSignUp(nome,email,pw,persist){return SB.sbSignUp(nome,email,pw,persist);}
 
-/* Mapeamento estado <-> linhas e envio ficam em src/data/ (v17). Aqui só ligam ao estado da tela (S), à sessão (ses) e à rede (api). */
-function dbId(id){return rowDbId(ses.user.id,id);}
-function takeSnap(){snap=snapshotOf(desiredRows(S,ses.user.id,tipoIds),profRow(S.perfil));}
-function pushAll(){return syncPush(api,ses.user.id,S,snap,tipoIds);}
+/* Mapeamento estado <-> linhas e envio ficam em src/data/ (v17). Aqui só ligam ao estado da tela (S), à sessão (SB.ses) e à rede (api). */
+function dbId(id){return rowDbId(SB.ses.user.id,id);}
+function takeSnap(){snap=snapshotOf(desiredRows(S,SB.ses.user.id,tipoIds),profRow(S.perfil));}
+function pushAll(){return syncPush(api,SB.ses.user.id,S,snap,tipoIds);}
 let snap=emptySnap(), tipoIds=new Map();
 async function fetchAll(table,cols,order){
   let out=[],from=0;const page=1000;
@@ -360,8 +258,8 @@ async function loadAll(){
     S=normalize(raw);
     takeSnap();
   }
-  if(!S.perfil.nome) S.perfil.nome=cleanName(ses.user.nome)||ses.user.email.split('@')[0];
-  auth.conta={nome:S.perfil.nome,email:ses.user.email};
+  if(!S.perfil.nome) S.perfil.nome=cleanName(SB.ses.user.nome)||SB.ses.user.email.split('@')[0];
+  auth.conta={nome:S.perfil.nome,email:SB.ses.user.email};
   lastLoad=Date.now();
 }
 function commit(){
@@ -372,7 +270,7 @@ function commit(){
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(flush,400);}
 async function flush(){
   saveTimer=null;
-  if(!auth.logged||!S||!S.persisted||!ses) return;
+  if(!auth.logged||!S||!S.persisted||!SB.ses) return;
   if(writing){dirty=true;return;}
   writing=true;
   try{
@@ -414,7 +312,7 @@ window.addEventListener('beforeunload',function(e){if(auth.logged&&pending()){e.
 let idleT=null;const IDLE_MS=15*60*1000;
 function bumpIdle(){
   clearTimeout(idleT);
-  if(!auth.logged||!ses||ses.persist) return;
+  if(!auth.logged||!SB.ses||SB.ses.persist) return;
   idleT=setTimeout(function(){
     if(pending()){bumpIdle();return;}
     sair('Você saiu por inatividade. Entre de novo para continuar.');
@@ -445,13 +343,13 @@ function backupObject(){
    bateria numa linha que não é sua e travaria a gravação. Então cada item do arquivo ganha um uuid calculado
    do id original e do usuário: sempre o mesmo para a mesma conta (importar duas vezes não duplica) e diferente
    entre contas. O que já existe aqui, com o id original ou com o calculado, é reconhecido e mantido. */
-const bkpUuid=id=>hashUuid(ses.user.id+'|bkp|'+id);
+const bkpUuid=id=>hashUuid(SB.ses.user.id+'|bkp|'+id);
 const wasThere=(have,id)=>have.has(id)||have.has(dbId(id))||have.has(bkpUuid(id));
 function mapId(have,id){if(have.has(id)) return id;const d=dbId(id);return have.has(d)?d:bkpUuid(id);}
 function planImport(o){
   if(!o||typeof o!=='object'||Array.isArray(o)||o.app!=='cuidar-em-casa') return {erro:'Este arquivo não é um backup do Cuidar em Casa.'};
   if(o.versao!==1) return {erro:'Este backup é de uma versão que o app não conhece.'};
-  if(!ses||!ses.user) return {erro:'Entre na sua conta para restaurar um backup.'};
+  if(!SB.ses||!SB.ses.user) return {erro:'Entre na sua conta para restaurar um backup.'};
   const n=normalize({companies:o.empresas,patients:o.pacientes,visits:o.atendimentos,tipos:o.tipos});
   const realIds=l=>new Set(l.filter(x=>!x.ex).map(x=>x.id));
   const haveC=realIds(S.companies),haveP=realIds(S.patients),haveV=realIds(S.visits);
@@ -664,19 +562,19 @@ async function entrarComSessao(){
 async function boot(){
   initState();
   showGate('wait');
-  const hs=readHashSession();
+  const hs=readHashSession(location,history);
   try{
     if(hs&&hs.error){auth.msg='O link não é mais válido. Peça um novo ou entre com sua senha.';}
     else if(hs&&hs.access_token){
-      ses={access_token:hs.access_token,refresh_token:hs.refresh_token,expires_at:Number(hs.expires_at)||(nowSec()+(Number(hs.expires_in)||3600)),user:{id:'',email:'',nome:''},persist:false};
+      SB.setSession({access_token:hs.access_token,refresh_token:hs.refresh_token,expires_at:Number(hs.expires_at)||(nowSec()+(Number(hs.expires_in)||3600)),user:{id:'',email:'',nome:''},persist:false});
       const u=await api('/auth/v1/user');
-      storeSes({access_token:ses.access_token,refresh_token:ses.refresh_token,expires_at:ses.expires_at,user:u},false);
+      storeSes({access_token:SB.ses.access_token,refresh_token:SB.ses.refresh_token,expires_at:SB.ses.expires_at,user:u},false);
       if(hs.type==='recovery'){showGate('nova');return;}
     }else{
       const r=readSes();
-      if(r) ses=r;
+      if(r) SB.setSession(r);
     }
-    if(ses){await entrarComSessao();return;}
+    if(SB.ses){await entrarComSessao();return;}
   }catch(e){
     if(e&&e.code==='network'){auth.msg=errMsg(e);return showGate('erro');}
     clearSes();
@@ -686,9 +584,9 @@ async function boot(){
 async function sair(msg,semGravar){
   closeSheet(true);
   clearTimeout(idleT);clearTimeout(retryTimer);
-  if(!semGravar&&auth.logged&&ses){try{await esperaGravar();}catch(e){}}
+  if(!semGravar&&auth.logged&&SB.ses){try{await esperaGravar();}catch(e){}}
   clearTimeout(saveTimer);saveTimer=null;
-  if(ses){try{await api('/auth/v1/logout?scope=local',{method:'POST'});}catch(e){}}
+  if(SB.ses){try{await api('/auth/v1/logout?scope=local',{method:'POST'});}catch(e){}}
   clearSes();
   auth.logged=false;auth.mode='';auth.conta=null;auth.msg=typeof msg==='string'?msg:'';
   S=makeDemo();snap=emptySnap();
@@ -794,8 +692,8 @@ async function doSenha(f){
   setBusy(f,true);
   try{
     try{
-      const d=await api('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email:ses.user.email,password:at}});
-      storeSes(d,ses.persist);
+      const d=await api('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email:SB.ses.user.email,password:at}});
+      storeSes(d,SB.ses.persist);
     }catch(e){
       setBusy(f,false);
       return fail(f,(e&&e.code==='http'&&e.status===400)?'A senha atual está incorreta.':errMsg(e,'Não foi possível verificar a senha atual.'),'atual');
