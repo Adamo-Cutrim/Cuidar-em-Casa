@@ -3,11 +3,13 @@ import {SHORT,LONG,LIM} from './src/core/limits.js';
 import {pad,iso,fromIso,addDays,startOfWeek,WD,WDL,MON,nowKey,age,isoToBr,brToIso} from './src/core/dates.js';
 import {esc,norm,initials,hashN,cleanName,pl} from './src/core/text.js';
 import {BRL,parseMoney} from './src/core/money.js';
-import {uid,isUuid,hashUuid} from './src/core/ids.js';
+import {uid,hashUuid} from './src/core/ids.js';
 import {okDate,normalize} from './src/domain/validation.js';
 import * as Q from './src/domain/queries.js';
 import * as Rec from './src/domain/recurrence.js';
 import * as Bill from './src/domain/billing.js';
+import {dbId as rowDbId,tipoKey,desiredRows,profRow,rowsToRaw} from './src/data/rows.js';
+import {emptySnap,snapshotOf,pushAll as syncPush} from './src/data/sync.js';
 /* ---------- utilidades ---------- */
 const $=(s,r)=>(r||document).querySelector(s);
 const ic=n=>'<svg class="i" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
@@ -322,12 +324,10 @@ function readHashSession(){
   return {access_token:p.get('access_token'),refresh_token:p.get('refresh_token')||'',expires_in:p.get('expires_in'),expires_at:p.get('expires_at'),type:p.get('type')};
 }
 
-const dbId=id=>isUuid(id)?id:hashUuid(ses.user.id+'|'+id);
-const tipoKey=n=>String(n).trim().toLowerCase();
-const dbTime=h=>typeof h==='string'?h.slice(0,5):'';
-const T_ORDER=['companies','patients','visits','recurrences','recurrence_exceptions','service_types'];
-const T_CONFLICT={companies:'id',patients:'id',visits:'id',recurrences:'patient_id',recurrence_exceptions:'patient_id,data',service_types:'id'};
-const emptySnap=()=>({companies:new Map(),patients:new Map(),visits:new Map(),recurrences:new Map(),recurrence_exceptions:new Map(),service_types:new Map(),perfil:''});
+/* Mapeamento estado <-> linhas e envio ficam em src/data/ (v17). Aqui só ligam ao estado da tela (S), à sessão (ses) e à rede (api). */
+function dbId(id){return rowDbId(ses.user.id,id);}
+function takeSnap(){snap=snapshotOf(desiredRows(S,ses.user.id,tipoIds),profRow(S.perfil));}
+function pushAll(){return syncPush(api,ses.user.id,S,snap,tipoIds);}
 let snap=emptySnap(), tipoIds=new Map();
 async function fetchAll(table,cols,order){
   let out=[],from=0;const page=1000;
@@ -340,50 +340,6 @@ async function fetchAll(table,cols,order){
   }
   return out;
 }
-function profRow(){
-  const p=S.perfil||{};
-  return {nome:p.nome||'',tel:p.tel||'',profissao:p.profissao||'',registro:p.registro||'',cidade:p.cidade||'',iniciado:true};
-}
-/* O que o banco deveria ter agora, tabela por tabela: Map(chave -> linha). Toda linha de uma tabela tem as mesmas colunas. */
-function desiredRows(){
-  const uid=ses.user.id,D={};
-  T_ORDER.forEach(function(t){D[t]=new Map();});
-  const comps=new Set();
-  S.companies.forEach(function(c){
-    if(c.ex) return;
-    const id=dbId(c.id);comps.add(c.id);
-    D.companies.set(id,{id:id,user_id:uid,nome:c.nome,tipo:c.tipo||'',contato:c.contato||'',valor_padrao:c.valorPadrao==null?null:c.valorPadrao,pagamento:c.pagamento||'',obs:c.obs||'',cor:c.cor||0});
-  });
-  const pats=new Set();
-  S.patients.forEach(function(p){
-    if(p.ex) return;
-    const id=dbId(p.id);pats.add(p.id);
-    D.patients.set(id,{id:id,user_id:uid,company_id:p.empresaId&&comps.has(p.empresaId)?dbId(p.empresaId):null,nome:p.nome,nasc:p.nasc||null,tel:p.tel||'',
-      resp_nome:p.respNome||'',resp_tel:p.respTel||'',endereco:p.endereco||'',bairro:p.bairro||'',ref:p.ref||'',valor:p.valor==null?null:p.valor,
-      condicoes:p.condicoes||'',alergias:p.alergias||'',medicamentos:p.medicamentos||'',obs:p.obs||''});
-    const r=p.rec;
-    if(r) D.recurrences.set(id,{patient_id:id,user_id:uid,ativo:!!r.ativo,dias:r.dias.slice(),hora:r.hora,tipo:r.tipo||'',inicio:r.inicio,fim:r.fim||null});
-    (p.recExc||[]).forEach(function(d){D.recurrence_exceptions.set(id+'|'+d,{patient_id:id,user_id:uid,data:d});});
-  });
-  S.visits.forEach(function(v){
-    if(v.ex||v.virtual||!pats.has(v.pacienteId)) return;
-    const id=dbId(v.id);
-    D.visits.set(id,{id:id,user_id:uid,patient_id:dbId(v.pacienteId),data:v.date,hora:v.hora,tipo:v.tipo||'',obs:v.obs||'',status:v.status,
-      serie_data:v.serie===v.pacienteId&&v.serieData?v.serieData:null,manual:!!v.manual});
-  });
-  if(Array.isArray(S.tipos)) S.tipos.forEach(function(n){
-    const k=tipoKey(n);
-    if(!k||D.service_types.has(tipoIds.get(k)||hashUuid(uid+'|tipo|'+k))) return;
-    const id=tipoIds.get(k)||hashUuid(uid+'|tipo|'+k);
-    D.service_types.set(id,{id:id,user_id:uid,nome:String(n).trim()});
-  });
-  return D;
-}
-function takeSnap(){
-  const D=desiredRows();snap=emptySnap();
-  T_ORDER.forEach(function(t){D[t].forEach(function(row,k){snap[t].set(k,JSON.stringify(row));});});
-  snap.perfil=JSON.stringify(profRow());
-}
 async function loadAll(){
   const r=await Promise.all([
     api('/rest/v1/profiles?select=nome,tel,profissao,registro,cidade,iniciado&limit=1'),
@@ -394,30 +350,8 @@ async function loadAll(){
     fetchAll('recurrence_exceptions','patient_id,data','patient_id,data'),
     fetchAll('service_types','id,nome','created_at,id')
   ]);
-  const p=(Array.isArray(r[0])&&r[0][0])||null;
-  const recs=new Map(),excs=new Map();
-  r[4].forEach(function(x){recs.set(x.patient_id,{ativo:x.ativo,dias:x.dias,hora:dbTime(x.hora),tipo:x.tipo,inicio:x.inicio,fim:x.fim||''});});
-  r[5].forEach(function(x){if(!excs.has(x.patient_id)) excs.set(x.patient_id,[]);excs.get(x.patient_id).push(x.data);});
-  tipoIds=new Map();r[6].forEach(function(x){tipoIds.set(tipoKey(x.nome),x.id);});
-  const raw={
-    companies:r[1].map(x=>({id:x.id,nome:x.nome,tipo:x.tipo,contato:x.contato,valorPadrao:x.valor_padrao,pagamento:x.pagamento,obs:x.obs,cor:x.cor})),
-    patients:r[2].map(function(x){
-      const o={id:x.id,nome:x.nome,nasc:x.nasc||'',tel:x.tel,respNome:x.resp_nome,respTel:x.resp_tel,endereco:x.endereco,bairro:x.bairro,ref:x.ref,
-        empresaId:x.company_id||'',valor:x.valor,condicoes:x.condicoes,alergias:x.alergias,medicamentos:x.medicamentos,obs:x.obs};
-      if(recs.has(x.id)) o.rec=recs.get(x.id);
-      if(excs.has(x.id)) o.recExc=excs.get(x.id);
-      return o;
-    }),
-    visits:r[3].map(function(x){
-      const o={id:x.id,pacienteId:x.patient_id,date:x.data,hora:dbTime(x.hora),tipo:x.tipo,obs:x.obs,status:x.status};
-      if(x.serie_data){o.serie=x.patient_id;o.serieData=x.serie_data;}
-      if(x.manual) o.manual=true;
-      return o;
-    }),
-    rev:0,
-    perfil:p?{nome:p.nome,tel:p.tel,profissao:p.profissao,registro:p.registro,cidade:p.cidade}:{},
-    tipos:r[6].length?r[6].map(x=>x.nome):undefined
-  };
+  const conv=rowsToRaw({profile:r[0],companies:r[1],patients:r[2],visits:r[3],recurrences:r[4],exceptions:r[5],serviceTypes:r[6]});
+  const raw=conv.raw,p=conv.p;tipoIds=conv.tipoIds;
   const semDados=!raw.companies.length&&!raw.patients.length&&!raw.visits.length;
   snap=emptySnap();
   if(semDados&&!(p&&p.iniciado)){
@@ -429,55 +363,6 @@ async function loadAll(){
   if(!S.perfil.nome) S.perfil.nome=cleanName(ses.user.nome)||ses.user.email.split('@')[0];
   auth.conta={nome:S.perfil.nome,email:ses.user.email};
   lastLoad=Date.now();
-}
-const inList=a=>'in.('+a.map(encodeURIComponent).join(',')+')';
-async function sendDeletes(t,keys){
-  if(!keys.length) return;
-  if(t==='recurrence_exceptions'){
-    const byP=new Map();
-    keys.forEach(function(k){const i=k.indexOf('|'),pid=k.slice(0,i);if(!byP.has(pid)) byP.set(pid,[]);byP.get(pid).push(k);});
-    for(const [pid,ks] of byP){
-      for(let i=0;i<ks.length;i+=100){
-        const part=ks.slice(i,i+100);
-        await api('/rest/v1/'+t+'?patient_id=eq.'+pid+'&data='+inList(part.map(k=>k.slice(k.indexOf('|')+1))),{method:'DELETE',prefer:'return=minimal'});
-        part.forEach(function(k){snap[t].delete(k);});
-      }
-    }
-    return;
-  }
-  const col=t==='recurrences'?'patient_id':'id';
-  for(let i=0;i<keys.length;i+=100){
-    const part=keys.slice(i,i+100);
-    await api('/rest/v1/'+t+'?'+col+'='+inList(part),{method:'DELETE',prefer:'return=minimal'});
-    part.forEach(function(k){snap[t].delete(k);});
-  }
-}
-async function sendUpserts(t,list){
-  for(let i=0;i<list.length;i+=200){
-    const part=list.slice(i,i+200);
-    await api('/rest/v1/'+t+'?on_conflict='+T_CONFLICT[t],{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:part.map(x=>x.row)});
-    part.forEach(function(x){snap[t].set(x.k,x.json);});
-  }
-}
-async function pushAll(){
-  const uid=ses.user.id;
-  const pj=JSON.stringify(profRow());
-  if(pj!==snap.perfil){
-    await api('/rest/v1/profiles?on_conflict=user_id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:Object.assign({user_id:uid},profRow())});
-    snap.perfil=pj;
-  }
-  const D=desiredRows(),up={},del={};
-  T_ORDER.forEach(function(t){
-    up[t]=[];del[t]=[];
-    D[t].forEach(function(row,k){const j=JSON.stringify(row);if(snap[t].get(k)!==j) up[t].push({k:k,row:row,json:j});});
-    snap[t].forEach(function(j,k){if(!D[t].has(k)) del[t].push(k);});
-  });
-  /* Ordem pensada para as chaves estrangeiras e unicidades: primeiro some o que saiu dos filhos,
-     depois grava pais antes de filhos, e por fim apaga pacientes e empresas (o banco cuida das cascatas). */
-  for(const t of ['recurrence_exceptions','recurrences','visits','service_types']) await sendDeletes(t,del[t]);
-  for(const t of T_ORDER) await sendUpserts(t,up[t]);
-  await sendDeletes('patients',del.patients);
-  await sendDeletes('companies',del.companies);
 }
 function commit(){
   S.persisted=true;S.rev=(S.rev||0)+1;
