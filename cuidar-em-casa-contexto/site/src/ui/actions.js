@@ -5,6 +5,7 @@ import {HIDE_KEY,ui,writeLocal} from '../app/state.js';
 import {st} from '../app/store.js';
 import {addDays,brToIso,fromIso,iso,startOfWeek} from '../core/dates.js';
 import {norm} from '../core/text.js';
+import {setStatus} from '../domain/visit.js';
 import {boot,doCriar,doEntrar,doNova,doReset,doSenha,openMenu,openPassword,openProfile,openSoon,sair,saveProfile,showGate} from './account.js';
 import {applyImport,backupObject,readBackupFile} from './backup.js';
 import {tipoOptions} from './bits.js';
@@ -123,7 +124,7 @@ const A={
   'edit-company':function(el){companyForm(findCompany(el.dataset.id));},
   'visit-status':function(el){
     const v=resolveVisit(el.dataset.id);if(!v) return;
-    v.status=el.dataset.status;commit();closeSheet();renderView();
+    setStatus(v,el.dataset.status,findPatient(v.pacienteId));commit();closeSheet();renderView();   /* guarda o valor ao marcar como realizado (v18a) */
     toast({feito:'Atendimento marcado como realizado.',cancelado:'Atendimento cancelado.',agendado:'Atendimento voltou para agendado.'}[v.status]);
   },
   'do-delete-visit':function(el){

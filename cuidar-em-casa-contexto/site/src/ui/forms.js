@@ -9,6 +9,7 @@ import {uid} from '../core/ids.js';
 import {LIM} from '../core/limits.js';
 import {parseMoney} from '../core/money.js';
 import {cleanName,esc,norm} from '../core/text.js';
+import {setStatus,snapshotValue} from '../domain/visit.js';
 import {avatar,exTag,tipoField} from './bits.js';
 import {openCompany} from './details.js';
 import {$,ic} from './dom.js';
@@ -212,10 +213,11 @@ export function saveVisit(f){
   if(id){
     const v=resolveVisit(id);
     if(v){
-      const moved=v.date!==o.date||v.hora!==o.hora;
+      const moved=v.date!==o.date||v.hora!==o.hora,trocou=v.pacienteId!==o.pacienteId;
       Object.assign(v,{pacienteId:o.pacienteId,date:o.date,hora:o.hora,tipo:o.tipo,obs:o.obs,manual:true});
+      if(trocou&&v.status==='feito') v.valorSnapshot=snapshotValue(findPatient(o.pacienteId));   /* outro paciente: vale o valor dele (v18a) */
       if(moved){
-        if(v.status==='cancelado'||(v.status==='feito'&&(o.date+' '+o.hora)>nowKey())) v.status='agendado';
+        if(v.status==='cancelado'||(v.status==='feito'&&(o.date+' '+o.hora)>nowKey())) setStatus(v,'agendado',findPatient(v.pacienteId));
         const d=fromIso(o.date);
         msg='Atendimento remarcado para '+WD[d.getDay()]+', '+pad(d.getDate())+'/'+pad(d.getMonth()+1)+' às '+o.hora+'.';
       }

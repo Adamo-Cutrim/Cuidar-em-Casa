@@ -40,7 +40,7 @@ export function desiredRows(state,userId,tipoIds){
     if(v.ex||v.virtual||!pats.has(v.pacienteId)) return;
     const id=dbId_(v.id);
     D.visits.set(id,{id:id,user_id:uid,patient_id:dbId_(v.pacienteId),data:v.date,hora:v.hora,tipo:v.tipo||'',obs:v.obs||'',status:v.status,
-      serie_data:v.serie===v.pacienteId&&v.serieData?v.serieData:null,manual:!!v.manual});
+      serie_data:v.serie===v.pacienteId&&v.serieData?v.serieData:null,manual:!!v.manual,valor_snapshot:v.status==='feito'&&v.valorSnapshot!=null?v.valorSnapshot:null});
   });
   if(Array.isArray(state.tipos)) state.tipos.forEach(function(n){
     const k=tipoKey(n);
@@ -71,6 +71,7 @@ export function rowsToRaw(t){
       const o={id:x.id,pacienteId:x.patient_id,date:x.data,hora:dbTime(x.hora),tipo:x.tipo,obs:x.obs,status:x.status};
       if(x.serie_data){o.serie=x.patient_id;o.serieData=x.serie_data;}
       if(x.manual) o.manual=true;
+      if(x.status==='feito') o.valorSnapshot=x.valor_snapshot==null?null:Number(x.valor_snapshot);
       return o;
     }),
     rev:0,

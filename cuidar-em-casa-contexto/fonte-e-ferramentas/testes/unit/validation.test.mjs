@@ -185,3 +185,12 @@ test('normalize: campo desconhecido e preservado quando e texto simples, descart
   assert.equal(n.patients[0].cor_favorita, 'azul'); assert.equal(n.patients[0].nivel, 3);
   assert.equal('aninhado' in n.patients[0], false); assert.equal('lista' in n.patients[0], false);
 });
+
+test('v18a: normVisit guarda valorSnapshot so em atendimento feito (numero valido, ou null explicito)', () => {
+  const f = o => normVisit({date: '2026-11-23', status: 'feito', ...o});
+  assert.strictEqual(f({valorSnapshot: 150}).valorSnapshot, 150); assert.strictEqual(f({valorSnapshot: '80.5'}).valorSnapshot, 80.5);
+  assert.strictEqual(f({valorSnapshot: 0}).valorSnapshot, 0); assert.strictEqual(f({valorSnapshot: null}).valorSnapshot, null);
+  for (const ruim of ['abc', -1, 1e9, NaN, Infinity, {}, []]) assert.strictEqual(f({valorSnapshot: ruim}).valorSnapshot, null, JSON.stringify(ruim));   // invalido = sem valor, nunca vai cru ao banco
+  assert.equal('valorSnapshot' in f({}), false);                                  // ausente continua ausente (dado antigo)
+  for (const status of ['agendado', 'cancelado', 'qualquer']) assert.equal('valorSnapshot' in normVisit({date: '2026-11-23', status, valorSnapshot: 150}), false, status);
+});

@@ -9,7 +9,7 @@ import {$,dlFile,ic} from './dom.js';
 import {dateField} from './fields.js';
 import {openSheet} from './sheet.js';
 /* ---------- relatório de faturamento ----------
-   Valor de cada atendimento = valor cadastrado no paciente. Feito = realizado. Agendado = previsto.
+   Valor de cada atendimento realizado = o valor guardado quando foi marcado como realizado (v18a); agendado = valor atual do paciente. Feito = realizado. Agendado = previsto.
    Cancelados não entram. Atendimentos recorrentes ainda não registrados contam como agendados. */
 export let dlRef={save:function(o){dlFile(o.filename,o.data,'text/csv');return Promise.resolve();}};
 const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
@@ -48,7 +48,7 @@ export function repRender(focusId){
       return '<li class="rrow"><span class="rr-main"><span class="row-name">'+esc(x.nome)+'</span><span class="row-sub">'+sub+'</span></span><span class="rr-vals"><span class="rr-real">'+money(x.real)+'</span>'+(x.ag?'<span class="rr-prev">+ '+money(x.prev)+' previsto</span>':'')+'</span></li>';
     }).join('')+'<li class="rrow total"><span class="rr-main"><span class="row-name">Total</span><span class="row-sub">'+pl(d.tot.feitos+d.tot.ag,'atendimento','atendimentos')+'</span></span><span class="rr-vals"><span class="rr-real">'+money(d.tot.real+d.tot.prev)+'</span><span class="rr-prev">realizado + previsto</span></span></li></ul>';
   }
-  if(d.semValor) h+='<p class="hint">'+pl(d.semValor,'atendimento de paciente sem valor cadastrado não entrou','atendimentos de pacientes sem valor cadastrado não entraram')+' na soma.</p>';
+  if(d.semValor) h+='<p class="hint">'+pl(d.semValor,'atendimento sem valor (o paciente não tinha valor cadastrado quando ele foi marcado como realizado, ou ainda não tem) não entrou','atendimentos sem valor (o paciente não tinha valor cadastrado quando foram marcados como realizados, ou ainda não tem) não entraram')+' na soma.</p>';
   if(d.pend) h+='<p class="hint">'+pl(d.pend,'atendimento de data passada ainda não foi marcado como feito e está','atendimentos de datas passadas ainda não foram marcados como feitos e estão')+' em Previsto. Marque como feito na agenda para entrar em Realizado.</p>';
   if(st.hide) h+='<p class="hint">Os valores estão ocultos. O arquivo baixado e o resumo copiado trazem os valores reais.</p><div class="sheet-actions"><button type="button" class="btn" data-action="rep-hide">'+ic('eye')+'Mostrar valores</button></div>';
   h+='<div class="sheet-actions">';

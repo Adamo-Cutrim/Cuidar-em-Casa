@@ -168,7 +168,7 @@ A v17 reorganizou o código sem mudar comportamento; E1 a E7 foram corrigidos. A
 
 | Etapa | Entrega | Depende de |
 |---|---|---|
-| v18a | **Valor no histórico**: `visits.valor_snapshot`, gravado ao marcar como feito; o relatório usa o valor guardado nos feitos (BACKEND §11 item 1) | migração + app + testes antes |
+| v18a ✅ | **Valor no histórico**: `visits.valor_snapshot`, gravado ao marcar como feito; o relatório usa o valor guardado nos feitos (BACKEND §11 item 1). **Feito em 24/11/2026**; migração aplicada antes do app | migração + app + testes antes |
 | v18b | **Tipos ligados à lista**: `visits.service_type_id`, migração dos textos atuais, cadastro de novos tipos (BACKEND §11 item 3) | v18a (mesma janela de migração) |
 | v19 | **Backup automático gratuito** (`backend/BACKUP_SEM_PLANO_PAGO.md`) | decisões do usuário: destino, guarda da chave, retenção; roteiro dos passos manuais |
 | v20a | **Offline 1**: service worker, o app abre sem internet | v18 |
@@ -256,6 +256,7 @@ Observação: várias skills `mattpocock-skills:*` assumem um repositório git e
 
 | Data | Mudança |
 |---|---|
+| 24/11/2026 | (Claude Code) **v18a: valor no histórico** (mudança de comportamento, PR próprio). Migração `valor_snapshot_em_visits` aplicada no banco **antes** do app (um app novo sem a coluna no banco nem abre os dados: confirmado no teste). `domain/visit.js` guarda o valor ao marcar como feito e apaga ao sair de feito; relatório usa o valor guardado nos feitos; `numOrNull` passou a recusar lista e booleano (antes `[]` virava 0). Testes antes do código: 12 falhavam; depois 153 unitários + 57 + 54 + 13 (novo `t4.py`) sem falhas; 14 de 15 mutações detectadas (a 15ª é equivalente); com a ação antiga o `t4` falha em 5. Cópia `versoes/v18_*` será salva ao fechar a v18 (com a v18b). |
 | 24/11/2026 | (Claude Code) **Decisões do usuário** sobre BACKEND §11 itens 1, 3 e 6 (valor no histórico ao marcar feito; tipos ligados à lista; offline necessário) e pedido de backup automático sem plano pago. Levantamento em `backend/BACKUP_SEM_PLANO_PAGO.md` (achado: o repositório do projeto é público, então nenhum backup pode ir para ele). Roteiro novo na seção 5b. |
 | 24/11/2026 | (Claude Code) **E6 corrigido** (mudança de comportamento, PR próprio): valor em reais aceita ponto de milhar sem vírgula e recusa negativo e valor de 1 bilhão para cima. 2 unitários e 2 verificações de navegador falhavam antes; depois, 134 + 57 + 54 sem falhas. |
 | 24/11/2026 | (Claude Code) **E7 corrigido** (mudança de comportamento, PR próprio): campos opcionais recusados pelo validador não voltam mais como "campo extra". Testes antes da correção: 4 unitários e 7 verificações de navegador falhavam; depois, 132 unitários + 57 + 52 sem falhas. |

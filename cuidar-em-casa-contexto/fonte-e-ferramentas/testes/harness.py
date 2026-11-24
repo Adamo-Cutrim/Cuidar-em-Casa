@@ -78,7 +78,7 @@ TABLES = {
     'visits': {'pk': ('id',), 'cols': {
         'id': (t_uuid, AUTO), 'user_id': (t_uuid, AUTO), 'patient_id': (t_uuid, None), 'data': (t_date, None),
         'hora': (t_time, '08:00:00'), 'tipo': (t_text(100), ''), 'obs': (t_text(5000), ''), 'status': (t_text(20), 'agendado'),
-        'serie_data': (t_date, 'null'), 'manual': (t_bool, False), 'created_at': (None, AUTO), 'updated_at': (None, AUTO)}},
+        'serie_data': (t_date, 'null'), 'manual': (t_bool, False), 'valor_snapshot': (t_num, 'null'), 'created_at': (None, AUTO), 'updated_at': (None, AUTO)}},
     'recurrences': {'pk': ('patient_id',), 'cols': {
         'patient_id': (t_uuid, None), 'user_id': (t_uuid, AUTO), 'ativo': (t_bool, True), 'dias': (t_days, []),
         'hora': (t_time, '08:00:00'), 'tipo': (t_text(100), ''), 'inicio': (t_date, None), 'fim': (t_date, 'null'),

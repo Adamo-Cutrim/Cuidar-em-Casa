@@ -149,6 +149,7 @@ test('dinheiro: numOrNull', () => {
   assert.equal(numOrNull(null), null); assert.equal(numOrNull(''), null); assert.equal(numOrNull(undefined), null);
   assert.equal(numOrNull('12'), 12); assert.equal(numOrNull(0), 0); assert.equal(numOrNull('0'), 0); assert.equal(numOrNull(150.5), 150.5);
   for (const v of ['abc', -1, 1e9, Infinity, NaN, {}]) assert.equal(numOrNull(v), null, String(v));
+  for (const v of [[], [5], true, false, () => 1, new Date(0)]) assert.equal(numOrNull(v), null, 'tipo nao numerico: ' + String(v));   // antes: [] e false viravam 0 e true virava 1
   assert.equal(numOrNull(999999999.99), 999999999.99);
 });
 

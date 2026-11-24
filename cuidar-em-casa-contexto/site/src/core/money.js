@@ -13,5 +13,5 @@ export function parseMoney(s){
   const n=Number(s);
   return isFinite(n)&&n>=0&&n<1e9?Math.round(n*100)/100:NaN;
 }
-export const numOrNull=v=>{if(v==null||v==='') return null;const n=Number(v);return isFinite(n)&&n>=0&&n<1e9?n:null;};
+export const numOrNull=v=>{if(v==null||v==='') return null;if(typeof v!=='number'&&typeof v!=='string') return null;const n=Number(v);return isFinite(n)&&n>=0&&n<1e9?n:null;};
 export const brl=v=>BRL.format(Number(v)||0);

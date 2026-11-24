@@ -7,7 +7,7 @@ import {uid} from '../core/ids.js';
 export const okDate=v=>typeof v==='string'&&ISO_D.test(v)&&brToIso(isoToBr(v))===v;
 /* Campos opcionais que o validador já tratou: se vieram inválidos, foram recusados e NÃO podem voltar como "campo extra"
    (E7: serieData "2026-02-30" chegava ao banco e o Postgres recusava o lote; ex:"sim" virava exemplo; virtual:true nunca era gravado). */
-const KNOWN={patient:new Set(['ex','rec','recExc']),company:new Set(['ex']),visit:new Set(['serie','serieData','manual','ex','virtual'])};
+const KNOWN={patient:new Set(['ex','rec','recExc']),company:new Set(['ex']),visit:new Set(['serie','serieData','manual','ex','virtual','valorSnapshot'])};
 export function keepExtra(src,dst,known){
   Object.keys(src).forEach(function(k){
     if(k==='__proto__'||k==='constructor'||k==='prototype'||Object.prototype.hasOwnProperty.call(dst,k)||(known&&known.has(k))) return;
@@ -48,6 +48,7 @@ export function normVisit(v){
   if(okDate(v.serieData)) o.serieData=v.serieData;
   if(v.manual===true) o.manual=true;
   if(v.ex===true) o.ex=true;
+  if(o.status==='feito'&&Object.prototype.hasOwnProperty.call(v,'valorSnapshot')) o.valorSnapshot=numOrNull(v.valorSnapshot);   /* valor guardado ao marcar como feito (v18a); inválido = sem valor */
   keepExtra(v,o,KNOWN.visit);return o;
 }
 export function normalize(o){
