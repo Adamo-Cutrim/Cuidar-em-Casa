@@ -18,8 +18,11 @@ fi
 TMP_ABS="${TMPDIR:-${TEMP:-/tmp}}"
 export SITE_DIR="$AQUI_PY/site_test" SHOT_DIR="${SHOT_DIR:-$TMP_ABS/}"
 rm -rf "$AQUI/site_test"; cp -r "$AQUI/../../site" "$AQUI/site_test"
-# O site de teste fala com o mock local em vez do Supabase real.
-sed -i "s#https://ynbqblvdtgwabczbssfp.supabase.co#http://127.0.0.1:8766#g" "$AQUI/site_test/app.js" "$AQUI/site_test/vercel.json"
+# O site de teste fala com o mock local em vez do Supabase real: troca o endereco em TODOS os arquivos
+# (desde a v17 parte 4 ele mora em src/app/state.js, nao no app.js). Se sobrar algum, para aqui.
+REAL="ynbqblvdtgwabczbssfp.supabase.co"
+grep -rl "$REAL" "$AQUI/site_test" | while read -r f; do sed -i "s#https://$REAL#http://127.0.0.1:8766#g" "$f"; done
+if grep -rq "$REAL" "$AQUI/site_test"; then echo "ERRO: o site de teste ainda aponta para o Supabase real:"; grep -rl "$REAL" "$AQUI/site_test"; exit 1; fi
 # CSP_ESTRITA=1: testa com style-src sem 'unsafe-inline' (como ficaria a producao depois da E3).
 if [ -n "${CSP_ESTRITA:-}" ]; then
   sed -i "s/style-src 'self' 'unsafe-inline'/style-src 'self'/" "$AQUI/site_test/vercel.json"
