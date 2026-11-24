@@ -7,7 +7,7 @@ export const startOfWeek=d=>addDays(d,-d.getDay());
 export const WD=['dom','seg','ter','qua','qui','sex','sáb'];
 export const WDL=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
 export const MON=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-export const nowKey=()=>{const n=new Date();return iso(n)+' '+pad(n.getHours())+':'+pad(n.getMinutes());};
+export const nowKey=(n=new Date())=>iso(n)+' '+pad(n.getHours())+':'+pad(n.getMinutes());
 export function age(n){
   if(!n) return null;
   const b=fromIso(n),t=new Date();
