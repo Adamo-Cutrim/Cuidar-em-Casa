@@ -71,7 +71,8 @@ alter default privileges for role postgres in schema public revoke all on functi
 alter default privileges for role postgres in schema public revoke all on sequences from anon, authenticated, service_role;
 alter default privileges for role postgres revoke execute on functions from public;
 SQL
-erradas=$(psql "$DESTINO" -X -At -v ON_ERROR_STOP=1 -c "select count(*) from pg_tables t where t.schemaname = 'public' and (has_table_privilege('anon', format('public.%I', t.tablename), 'select') or has_table_privilege('authenticated', format('public.%I', t.tablename), 'truncate') or not has_table_privilege('authenticated', format('public.%I', t.tablename), 'update'))")
+# Por oid (nao por nome): o Postgres pode avaliar has_table_privilege antes do filtro de schema, e um nome de tabela do sistema nao resolve.
+erradas=$(psql "$DESTINO" -X -At -v ON_ERROR_STOP=1 -c "select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p') and (has_table_privilege('anon', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'truncate') or not has_table_privilege('authenticated', c.oid, 'update'))")
 [[ "$erradas" == "0" ]] || erro "$erradas tabela(s) com permissao errada depois de reaplicar. Confira antes de usar o app."
 echo "    permissoes conferidas: anon sem acesso, usuario logado so com select/insert/update/delete."
 
