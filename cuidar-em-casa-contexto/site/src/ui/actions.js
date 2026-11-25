@@ -6,7 +6,7 @@ import {st} from '../app/store.js';
 import {addDays,brToIso,fromIso,iso,startOfWeek} from '../core/dates.js';
 import {norm} from '../core/text.js';
 import {setStatus} from '../domain/visit.js';
-import {boot,doCriar,doEntrar,doNova,doReset,doSenha,openConfig,openMenu,openPassword,openProfile,openSoon,sair,saveProfile,showGate} from './account.js';
+import {boot,doCriar,doEntrar,doNova,doReset,doSenha,doExcluir,openConfig,openExcluir,openMenu,openPassword,openProfile,openSoon,sair,saveProfile,showGate} from './account.js';
 import {applyImport,backupObject,readBackupFile} from './backup.js';
 import {tipoOptions} from './bits.js';
 import {openCompany,openPatient,openVisit} from './details.js';
@@ -85,6 +85,7 @@ const A={
     dlRef.save({filename:'faturamento_por-'+r.by+'_'+r.from+'_a_'+r.to+'.csv',data:repCsv()}).then(function(){toast('Planilha salva.');},function(e){if(e&&e.code==='declined') return;toast('Não foi possível salvar a planilha.');});
   },
   'open-menu':function(){openMenu();},
+  'open-excluir':function(){openExcluir();},
   'open-password':function(){openPassword();},
   'menu-go':function(el){
     const g=el.dataset.go;
@@ -200,6 +201,7 @@ document.addEventListener('submit',function(e){
   else if(f.id==='f-reset') doReset(f);
   else if(f.id==='f-nova') doNova(f);
   else if(f.id==='f-senha') doSenha(f);
+  else if(f.id==='f-excluir') doExcluir(f);
   else if(f.id==='f-perfil') saveProfile(f);
 });
 document.addEventListener('input',function(e){

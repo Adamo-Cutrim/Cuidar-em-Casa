@@ -12,3 +12,9 @@ function delLocal(k){try{localStorage.removeItem(k);}catch(e){}}
 function delSess(k){try{sessionStorage.removeItem(k);}catch(e){}}
 export function readLocal(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 export function writeLocal(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+/* Excluir conta: apaga tudo o que o app guardou neste aparelho (sessão e preferências). */
+export function wipeAppStorage(){
+  [function(){return localStorage;},function(){return sessionStorage;}].forEach(function(get){
+    try{const s=get();Object.keys(s).filter(k=>k.indexOf('cuidar-em-casa:')===0).forEach(k=>s.removeItem(k));}catch(e){}
+  });
+}
