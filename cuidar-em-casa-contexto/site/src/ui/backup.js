@@ -9,6 +9,7 @@ import {hashUuid} from '../core/ids.js';
 import {esc,pl} from '../core/text.js';
 import {tipoKey} from '../data/rows.js';
 import {normalize,okDate} from '../domain/validation.js';
+import {snapshotValue} from '../domain/visit.js';
 import {closeSheet,openSheet,toast} from './sheet.js';
 import {renderAll} from './views.js';
 /* ---------- backup: baixar e restaurar ----------
@@ -60,6 +61,10 @@ function planImport(o){
     if(!(inP.has(v.pacienteId)||wasThere(haveP,v.pacienteId))){r.semPaciente++;return;}
     v.id=mapId(haveV,v.id);v.pacienteId=mapId(haveP,v.pacienteId);
     if(v.serie) v.serie=mapId(haveP,v.serie);
+    if(v.status==='feito'&&!Object.prototype.hasOwnProperty.call(v,'valorSnapshot')){   /* arquivo de antes da v18a: usa o valor do paciente de agora */
+      const pp=r.patients.find(x=>x.id===v.pacienteId)||st.S.patients.find(x=>x.id===v.pacienteId);
+      v.valorSnapshot=snapshotValue(pp);
+    }
     r.visits.push(v);
   });
   if(Array.isArray(n.tipos)){

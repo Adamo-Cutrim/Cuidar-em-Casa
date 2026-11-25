@@ -62,11 +62,12 @@ Passos que estavam pendentes (todos feitos):
 - ~~**E7**~~ **corrigido em 24/11/2026**: backup adulterado (ex.: `serieData` `2026-02-30`, `ex: "sim"`) não trava mais a gravação; o valor inválido é descartado na validação.
 - ~~**E6**~~ **corrigido em 24/11/2026**: `1.234` vale mil duzentos e trinta e quatro; valor negativo pede correção.
 - **Troca de deploy:** por alguns segundos, durante a troca, a CDN pode servir o `app.js` novo com um módulo antigo ou ainda ausente (visto em 24/11: `supabase.js` deu 404 logo após o deploy, depois 200). Melhoria possível: versionar os caminhos dos módulos.
+- **v18 feita (24/11/2026)** (`versoes/v18_2026-11-24_1909_site/`): **v18a** o valor do atendimento é guardado ao marcar como feito (`visits.valor_snapshot`); **v18b** atendimento e recorrência ligados ao tipo da lista (`service_type_id`). Migrações aplicadas. Próximas: v19 (backup automático, aguarda decisões do usuário) e v20 (offline).
 - **Decisões de 24/11/2026** (BACKEND §11): valor do atendimento guardado ao marcar como feito; tipo de atendimento ligado à lista de tipos; **uso offline é necessário**; backup automático sem plano pago. Roteiro na ESTRUTURA_BASE seção 5b. **Atenção:** o repositório do projeto é **público**; nunca guardar backup, chave ou dado de paciente nele. Levantamento do backup: `backend/BACKUP_SEM_PLANO_PAGO.md`.
-- Testes: `fonte-e-ferramentas/testes/rodar_testes.sh` roda 131 testes unitários (Node, `testes/unit`) e 101 de navegador; roda também no Windows (Git Bash + Python 3 + Playwright). `testes/lint.sh` procura nomes sem import (ESLint `no-undef`). Eles **não detectam** violações de CSP; para isso há a opção `CSP_ESTRITA=1` (só aplica o cabeçalho, a conferência é por console/estilo calculado).
+- Testes: `fonte-e-ferramentas/testes/rodar_testes.sh` roda 172 testes unitários (Node, `testes/unit`) e 142 de navegador (`t2` a `t5`); roda também no Windows (Git Bash + Python 3 + Playwright). `testes/lint.sh` procura nomes sem import (ESLint `no-undef`). Eles **não detectam** violações de CSP; para isso há a opção `CSP_ESTRITA=1` (só aplica o cabeçalho, a conferência é por console/estilo calculado).
 - Decisões em aberto: `BACKEND.md` seção 11.
 - LGPD: dados de saúde são sensíveis; validar com profissional de proteção de dados antes de usar dados reais.
 
 ## Integridade
-`site/app.js` sha256 `b95e213268680bd92681f20d3e3d5df8c57494e805cc50f6b91da25b99f58abd` (v17, só a entrada; os módulos estão em `versoes/v17_2026-11-24_1135_site/src/`)
-`site/styles.css` sha256 `c40017326b8c6fefdac84369afd5b7a61662376114ef4258c8bbb35442d5ce92`
+`site/app.js` sha256 `b95e213268680bd92681f20d3e3d5df8c57494e805cc50f6b91da25b99f58abd` (v18, só a entrada; os módulos estão em `versoes/v18_2026-11-24_1909_site/src/`)
+`site/styles.css` sha256 `38799ba7bd4d33cc516669dabd41fbff3331412adeb9631b02e61afd53ae9cf5`

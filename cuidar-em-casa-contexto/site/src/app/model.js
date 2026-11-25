@@ -2,11 +2,13 @@
 import {cleanName,norm} from '../core/text.js';
 import {TIPOS_ATEND} from './catalog.js';
 import {commit} from './persistence.js';
+import {SB} from './session.js';
 import {ui} from './state.js';
 import {st} from './store.js';
 import * as Bill from '../domain/billing.js';
 import * as Q from '../domain/queries.js';
 import * as Rec from '../domain/recurrence.js';
+import {deleteTipoNoEstado,renameTipoNoEstado} from '../domain/tipos.js';
 /* Consultas e regras ficam em src/domain/ (v17). Aqui só ligam ao estado da tela: S (dados) e ui (filtros). */
 export function findPatient(id){return Q.findPatient(st.S,id);}
 export function findCompany(id){return Q.findCompany(st.S,id);}
@@ -38,13 +40,10 @@ export function addTipo(nome){
 }
 export function renameTipo(old,nome){
   ensureTipos();
-  const i=st.S.tipos.indexOf(old);
-  if(i>-1) st.S.tipos[i]=nome;else st.S.tipos.push(nome);
-  st.S.visits.forEach(function(v){if(v.tipo===old) v.tipo=nome;});
-  st.S.patients.forEach(function(p){if(p.rec&&p.rec.tipo===old) p.rec.tipo=nome;});
+  renameTipoNoEstado(st.S,st.tipoIds,SB.ses.user.id,old,nome);   /* o id do tipo fica: a linha é atualizada, não trocada (v18b) */
   commit();
 }
-export function deleteTipo(nome){ensureTipos();st.S.tipos=st.S.tipos.filter(t=>t!==nome);commit();}
+export function deleteTipo(nome){ensureTipos();deleteTipoNoEstado(st.S,nome);commit();}
 export function tipoUso(t){
   const at=st.S.visits.filter(v=>v.tipo===t).length,pac=st.S.patients.filter(p=>p.rec&&p.rec.ativo&&p.rec.tipo===t).length;
   const parts=[];

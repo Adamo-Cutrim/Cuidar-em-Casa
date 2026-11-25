@@ -78,10 +78,10 @@ TABLES = {
     'visits': {'pk': ('id',), 'cols': {
         'id': (t_uuid, AUTO), 'user_id': (t_uuid, AUTO), 'patient_id': (t_uuid, None), 'data': (t_date, None),
         'hora': (t_time, '08:00:00'), 'tipo': (t_text(100), ''), 'obs': (t_text(5000), ''), 'status': (t_text(20), 'agendado'),
-        'serie_data': (t_date, 'null'), 'manual': (t_bool, False), 'created_at': (None, AUTO), 'updated_at': (None, AUTO)}},
+        'serie_data': (t_date, 'null'), 'manual': (t_bool, False), 'valor_snapshot': (t_num, 'null'), 'service_type_id': (t_uuid, 'null'), 'created_at': (None, AUTO), 'updated_at': (None, AUTO)}},
     'recurrences': {'pk': ('patient_id',), 'cols': {
         'patient_id': (t_uuid, None), 'user_id': (t_uuid, AUTO), 'ativo': (t_bool, True), 'dias': (t_days, []),
-        'hora': (t_time, '08:00:00'), 'tipo': (t_text(100), ''), 'inicio': (t_date, None), 'fim': (t_date, 'null'),
+        'hora': (t_time, '08:00:00'), 'tipo': (t_text(100), ''), 'inicio': (t_date, None), 'fim': (t_date, 'null'), 'service_type_id': (t_uuid, 'null'),
         'created_at': (None, AUTO), 'updated_at': (None, AUTO)}},
     'recurrence_exceptions': {'pk': ('patient_id', 'data'), 'cols': {
         'patient_id': (t_uuid, None), 'data': (t_date, None), 'user_id': (t_uuid, AUTO), 'created_at': (None, AUTO)}},
@@ -133,6 +133,9 @@ class Db:
         if t == 'patients' and r['company_id'] is not None:
             c = self.rows['companies'].get((r['company_id'],))
             if not c or c['user_id'] != u: raise DbError(409, '23503', 'violates foreign key constraint patients_user_id_company_id_fkey')
+        if t in ('visits', 'recurrences') and r.get('service_type_id') is not None:   # v18b: tipo ligado (FK composta user_id, service_type_id)
+            st = self.rows['service_types'].get((r['service_type_id'],))
+            if not st or st['user_id'] != u: raise DbError(409, '23503', 'violates foreign key constraint %s_service_type_fk' % t)
         if t in ('visits', 'recurrences', 'recurrence_exceptions'):
             p = self.rows['patients'].get((r['patient_id'],))
             if not p or p['user_id'] != u: raise DbError(409, '23503', 'violates foreign key constraint %s_user_id_patient_id_fkey' % t)
@@ -179,6 +182,10 @@ class Db:
                 for tt in ('visits', 'recurrences', 'recurrence_exceptions'):
                     for k, o in list(self.rows[tt].items()):
                         if o['user_id'] == uid and o['patient_id'] == r['id']: del self.rows[tt][k]
+            if t == 'service_types':  # on delete set null (service_type_id): o atendimento fica com o nome em texto
+                for tt in ('visits', 'recurrences'):
+                    for o in self.mine(tt, uid):
+                        if o['service_type_id'] == r['id']: o['service_type_id'] = None
             if t == 'companies':  # on delete set null (company_id)
                 for o in self.mine('patients', uid):
                     if o['company_id'] == r['id']: o['company_id'] = None
