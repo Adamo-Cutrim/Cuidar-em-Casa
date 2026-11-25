@@ -74,11 +74,12 @@ Verificado (testes que rodam no seu computador):
 - A role `backup_ro` foi testada **no banco real** (numa transação desfeita): lê tudo e recusa escrita.
 - Controles de sabotagem: uma tabela omitida do backup, identidades esquecidas na restauração e o defeito do `.env` foram **detectados** pelos ensaios.
 
-**Ainda NÃO verificado** (só dá para ver depois que você rodar o assistente):
-- A conexão do GitHub ao Supabase pelo **Session pooler** e o `pg_dump 17` por ele.
-- O primeiro backup de verdade no GitHub Actions.
-- A **restauração num projeto Supabase real** (as contas são recriadas por `insert` direto em `auth.users` e `auth.identities`, validado no esquema real, mas não contra o servidor de autenticação do Supabase). **É exatamente para isso que existe a etapa 9 do assistente.** Se a pessoa não conseguir entrar por "Esqueci a senha", usar a API de administração do Supabase para recriar a conta.
+**Verificado em 25/11/2026 (primeira execução real):** a conexão do GitHub ao Supabase pelo Session pooler e o `pg_dump 17` por ele; o primeiro backup no GitHub Actions (cifrado, 9 KB, sem senha no log); e a **restauração completa num projeto Supabase de verdade** (`cuidar-em-casa-restauracao-teste`, depois apagado), com as contas recriadas. O roteiro está em [`ROTEIRO_RESTAURACAO.md`](ROTEIRO_RESTAURACAO.md).
+
+**Ainda NÃO verificado:**
+- O backup agendado das 02:30 rodando sozinho (conferir na aba Actions do repositório privado no dia seguinte).
 - O limite de retenção de artefatos para repositórios privados (padrão 90 dias; usamos 30).
+- Que uma conta restaurada consiga entrar pelo "Esqueci a senha" no app apontado para o projeto novo (o ensaio conferiu as contas no painel, não o login).
 
 ## Quando algo muda
 
