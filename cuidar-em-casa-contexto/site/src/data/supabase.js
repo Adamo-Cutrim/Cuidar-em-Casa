@@ -5,7 +5,7 @@ export const nowSec=()=>Math.floor(Date.now()/1000);
 export const SB_ERR={
   invalid_credentials:'E-mail ou senha incorretos.',
   email_not_confirmed:'Confirme seu e-mail pelo link que enviamos antes de entrar.',
-  weak_password:'Essa senha é fraca demais. Use uma senha mais longa e menos comum.',
+  weak_password:'Senha fora das regras. Use pelo menos 8 caracteres, com letras maiúsculas e minúsculas, números e símbolos, e evite senhas comuns.',
   over_request_rate_limit:'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
   over_email_send_rate_limit:'Muitos e-mails enviados. Aguarde alguns minutos e tente de novo.',
   signup_disabled:'Novos cadastros estão desativados.',
