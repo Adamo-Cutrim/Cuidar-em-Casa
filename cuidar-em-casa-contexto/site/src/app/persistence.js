@@ -3,10 +3,11 @@ import {cleanName} from '../core/text.js';
 import {dbId as rowDbId,desiredRows,profRow,rowsToRaw} from '../data/rows.js';
 import {emptySnap,pushAll as syncPush,snapshotOf} from '../data/sync.js';
 import {normalize} from '../domain/validation.js';
-import {sair} from '../ui/account.js';
+import {sair,travarOffline} from '../ui/account.js';
 import {$} from '../ui/dom.js';
 import {toast} from '../ui/sheet.js';
 import {renderAll} from '../ui/views.js';
+import {atualizarCopia} from './aparelho.js';
 import {makeDemo} from './catalog.js';
 import {SB,api} from './session.js';
 import {HEALTH_KEY,HIDE_KEY,auth,readLocal} from './state.js';
@@ -22,6 +23,7 @@ function setMode(m){
   const f=$('#foot');if(f) f.textContent=statusText();
 }
 export function statusText(){
+  if(st.offline) return 'Sem internet: mostrando a cópia guardada neste aparelho.';
   if(!st.S||!st.S.persisted) return 'Dados de exemplo. Nada foi salvo ainda.';
   if(st.dbMode==='salvando') return 'Salvando…';
   if(st.dbMode==='erro') return 'Não foi possível salvar agora. Tentando de novo…';
@@ -69,6 +71,11 @@ export async function loadAll(){
   st.lastLoad=Date.now();
 }
 export function commit(){
+  if(st.offline){   /* v20b é só consulta: desfaz qualquer alteração feita sem internet */
+    st.S=JSON.parse(st.offlineJson);renderAll();
+    toast('Sem internet: por enquanto o app só mostra os dados. Para registrar, conecte-se.');
+    return;
+  }
   st.S.persisted=true;st.S.rev=(st.S.rev||0)+1;
   setMode('salvando');
   scheduleSave();
@@ -76,13 +83,14 @@ export function commit(){
 function scheduleSave(){clearTimeout(st.saveTimer);st.saveTimer=setTimeout(flush,400);}
 async function flush(){
   st.saveTimer=null;
-  if(!auth.logged||!st.S||!st.S.persisted||!SB.ses) return;
+  if(st.offline||!auth.logged||!st.S||!st.S.persisted||!SB.ses) return;
   if(st.writing){st.dirty=true;return;}
   st.writing=true;
   try{
     do{st.dirty=false;await pushAll();}while(st.dirty);
     st.retryN=0;st.failToast=false;clearTimeout(st.retryTimer);
     setMode('conta');
+    atualizarCopia();   /* v20b: a cópia do aparelho acompanha o que foi salvo */
   }catch(e){
     if(e&&e.code==='expired'){st.writing=false;sair('Sua sessão expirou. Entre de novo. As últimas alterações podem não ter sido salvas.',true);return;}
     const permanente=e&&e.code==='http'&&e.status>=400&&e.status<500&&e.status!==408&&e.status!==429;
@@ -107,11 +115,11 @@ async function refreshData(){
   catch(e){if(e&&e.code==='expired') sair('Sua sessão expirou. Entre de novo.',true);}
 }
 document.addEventListener('visibilitychange',function(){
-  if(!auth.logged) return;
+  if(!auth.logged||st.offline) return;
   if(document.visibilityState==='hidden'){if(st.saveTimer){clearTimeout(st.saveTimer);flush();}return;}
   if(Date.now()-st.lastLoad>30000&&!pending()&&!$('#sheet-root').firstChild) refreshData();
 });
-window.addEventListener('online',function(){if(auth.logged&&st.dbMode==='erro') scheduleSave();});
+window.addEventListener('online',function(){if(auth.logged&&!st.offline&&st.dbMode==='erro') scheduleSave();});
 window.addEventListener('beforeunload',function(e){if(auth.logged&&pending()){e.preventDefault();e.returnValue='';}});
 
 /* Quem não escolheu "manter conectado" sai sozinho depois de 15 minutos sem uso. */
@@ -119,6 +127,7 @@ export let idleT=null;
 const IDLE_MS=15*60*1000;
 export function bumpIdle(){
   clearTimeout(idleT);
+  if(auth.logged&&st.offline){idleT=setTimeout(travarOffline,IDLE_MS);return;}   /* v20b: sem internet, trava e pede o PIN de novo */
   if(!auth.logged||!SB.ses||SB.ses.persist) return;
   idleT=setTimeout(function(){
     if(pending()){bumpIdle();return;}

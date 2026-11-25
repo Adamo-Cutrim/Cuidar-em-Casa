@@ -6,7 +6,7 @@ import {st} from '../app/store.js';
 import {addDays,brToIso,fromIso,iso,startOfWeek} from '../core/dates.js';
 import {norm} from '../core/text.js';
 import {setStatus} from '../domain/visit.js';
-import {boot,doCriar,doEntrar,doNova,doReset,doSenha,doExcluir,openConfig,openExcluir,openMenu,openPassword,openProfile,openSoon,sair,saveProfile,showGate} from './account.js';
+import {boot,doCriar,doEntrar,doNova,doReset,doSenha,desativarOffline,doExcluir,doOffline,doPin,openConfig,openOffline,sairDaConta,openExcluir,openMenu,openPassword,openProfile,openSoon,saveProfile,showGate} from './account.js';
 import {tipoOptions} from './bits.js';
 import {openCompany,openPatient,openVisit} from './details.js';
 import {$} from './dom.js';
@@ -94,7 +94,11 @@ const A={
     else if(g==='fatur'){repInit({by:'paciente',emp:'all',pac:'all'});openReport();}
     else openSoon(g);
   },
-  'logout':function(){sair();},
+  'logout':function(){sairDaConta();},
+  'pin-abrir':function(){showGate('pin');},
+  'offline-ativar':function(){openOffline('ativar');},
+  'offline-trocar':function(){openOffline('trocar');},
+  'offline-desativar':function(){desativarOffline();},
   'confirm-move':function(el){const f=el.closest('form');if(!f) return;f.dataset.moveOk='1';if(f.id==='f-patient') savePatient(f);else if(f.id==='f-link') saveLink(f);},
   'cancel-move':function(el){const f=el.closest('form');if(f) clearMove(f);},
   'link-patients':function(el){linkForm(el.dataset.company);},
@@ -193,6 +197,8 @@ document.addEventListener('submit',function(e){
   else if(f.id==='f-nova') doNova(f);
   else if(f.id==='f-senha') doSenha(f);
   else if(f.id==='f-excluir') doExcluir(f);
+  else if(f.id==='f-pin') doPin(f);
+  else if(f.id==='f-offline') doOffline(f);
   else if(f.id==='f-perfil') saveProfile(f);
 });
 document.addEventListener('input',function(e){

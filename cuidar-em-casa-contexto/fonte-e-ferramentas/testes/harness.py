@@ -210,7 +210,7 @@ def out_row(r, sel):
     return o
 
 class Mock(BaseHTTPRequestHandler):
-    users = {}; byid = {}; access = {}; refresh = {}; amr = {}   # amr: token -> metodos de login com horario (como o JWT do Supabase)
+    users = {}; byid = {}; access = {}; refresh = {}; amr = {}; segredos = {}   # segredos: uid -> segredo do aparelho (v20b)   # amr: token -> metodos de login com horario (como o JWT do Supabase)
     db = Db(); log = []; fail_n = 0; reject_n = 0
     def log_message(self, *a): pass
     def cors(self):
@@ -267,6 +267,9 @@ class Mock(BaseHTTPRequestHandler):
             self.send_response(204); self.cors(); self.end_headers(); return
         uid = self.uid()
         if not uid or uid not in Mock.byid: return self.err(401, 'bad_jwt', 'invalid JWT')
+        if p == '/rest/v1/rpc/segredo_do_aparelho' and m == 'POST':   # backend/sql/2026-11-25_segredo_do_aparelho.sql
+            if Mock.fail_n > 0: Mock.fail_n -= 1; return self.err(503, 'unexpected_failure', 'down')
+            return self.out(200, Mock.segredos.setdefault(uid, secrets.token_hex(32)))
         if p == '/rest/v1/rpc/excluir_minha_conta' and m == 'POST':   # backend/sql/2026-11-25_excluir_minha_conta.sql
             if Mock.fail_n > 0: Mock.fail_n -= 1; return self.err(503, 'unexpected_failure', 'down')
             tok = self.headers.get('Authorization', '').replace('Bearer ', '')
@@ -274,7 +277,7 @@ class Mock(BaseHTTPRequestHandler):
             if not ts or max(ts) < time.time() - 600:
                 Mock.log.append(('RECUSA', p, 'reautenticacao'))
                 return self.out(403, {'code': '42501', 'message': 'excluir_minha_conta: confirme a senha de novo', 'details': None, 'hint': 'reautenticacao'})
-            us = Mock.byid.pop(uid); del Mock.users[us['email']]
+            us = Mock.byid.pop(uid); del Mock.users[us['email']]; Mock.segredos.pop(uid, None)
             for t in Mock.db.rows:
                 for k, r in list(Mock.db.rows[t].items()):
                     if r['user_id'] == uid: del Mock.db.rows[t][k]
