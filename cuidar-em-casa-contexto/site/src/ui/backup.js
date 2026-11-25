@@ -12,7 +12,7 @@ import {normalize,okDate} from '../domain/validation.js';
 import {snapshotValue} from '../domain/visit.js';
 import {closeSheet,openSheet,toast} from './sheet.js';
 import {renderAll} from './views.js';
-/* ---------- backup: baixar e restaurar ----------
+/* ---------- backup: restaurar (a opção de baixar saiu em 25/11/2026: o backup é automático, ver ../backup/README.md) ----------
    Arquivo JSON {app,versao,exportadoEm,perfil,tipos,empresas,pacientes,atendimentos}.
    Dados de exemplo (ex:true) nunca entram no arquivo nem voltam dele.
    Restaurar só ACRESCENTA: o que já existe (mesmo id) fica como está; nada é apagado nem sobrescrito.
@@ -20,11 +20,6 @@ import {renderAll} from './views.js';
    atendimento sem paciente é descartado. Tudo é contado e mostrado antes de confirmar. */
 const BKP_MAX=5*1024*1024;
 let pendingImport=null;
-export function backupObject(){
-  const real=x=>!x.ex;
-  return {app:'cuidar-em-casa',versao:1,exportadoEm:new Date().toISOString(),perfil:st.S.perfil,tipos:st.S.tipos||null,
-    empresas:st.S.companies.filter(real),pacientes:st.S.patients.filter(real),atendimentos:st.S.visits.filter(real)};
-}
 /* Ids do arquivo -> ids desta conta. A chave primária do banco é o id sozinho: importar o id de OUTRA conta
    bateria numa linha que não é sua e travaria a gravação. Então cada item do arquivo ganha um uuid calculado
    do id original e do usuário: sempre o mesmo para a mesma conta (importar duas vezes não duplica) e diferente

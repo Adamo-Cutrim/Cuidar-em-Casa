@@ -56,9 +56,7 @@ with sync_playwright() as p:
     ctx = b.new_context(viewport={'width': 390, 'height': 844}, has_touch=True, accept_downloads=True); pg = newpage(ctx)
 
     print('A) conta nova, so com dados de exemplo'); create_account(pg, 'Lia', E_BIA, PW); open_perfil(pg)
-    chk('Perfil tem baixar e restaurar', pg.locator('[data-action="backup"]').count() == 1 and pg.locator('[data-action="import-pick"]').count() == 1)
-    pg.locator('[data-action="backup"]').click(); pg.wait_for_timeout(300)
-    chk('baixar sem dados proprios avisa e nao baixa', 'Ainda não há dados seus' in toast(pg), toast(pg))
+    chk('Perfil nao tem baixar (opcao C) e tem restaurar', pg.locator('[data-action="backup"]').count() == 0 and pg.locator('[data-action="import-pick"]').count() == 1)
 
     print('B) arquivos que nao servem')
     pick(pg, wfile('texto.json', 'isto nao e json')); chk('texto solto', 'Não foi possível ler' in toast(pg), toast(pg))
@@ -101,13 +99,9 @@ with sync_playwright() as p:
     open_perfil(pg); pick(pg, F_BKP); s = sheet(pg)
     chk('continua dizendo que nao ha nada novo', 'Nada novo neste arquivo' in s, s.replace('\n', ' | ')); pg.locator('.sheet [data-action="close-sheet"]').first.click(); pg.wait_for_timeout(300)
 
-    print('F) baixar o backup'); open_perfil(pg)
-    with pg.expect_download() as dl: pg.locator('[data-action="backup"]').click()
-    d = dl.value; path = os.path.join(TMP, 'baixado.json'); d.save_as(path); exp = json.load(open(path, encoding='utf-8'))
-    chk('nome do arquivo', re.match(r'^cuidar-em-casa_backup_\d{4}-\d{2}-\d{2}\.json$', d.suggested_filename), d.suggested_filename)
-    chk('formato e contagens', exp['app'] == 'cuidar-em-casa' and exp['versao'] == 1 and (len(exp['empresas']), len(exp['pacientes']), len(exp['atendimentos'])) == (2, 3, 2), (len(exp['empresas']), len(exp['pacientes']), len(exp['atendimentos'])))
-    chk('sem dados de exemplo', not any(x.get('ex') for x in exp['empresas'] + exp['pacientes'] + exp['atendimentos']))
-    chk('exportado tem os ids do banco', {x['id'] for x in exp['pacientes']} == {r['id'] for r in rows('patients', E_BIA)})
+    print('F) sem botao de baixar; o arquivo para a outra conta vem do arquivo de teste'); open_perfil(pg)
+    path = F_BKP
+    chk('nao ha botao de baixar', pg.locator('[data-action="backup"]').count() == 0)
     bia_ids = {t: {r['id'] for r in rows(t, E_BIA)} for t in ('companies', 'patients', 'visits')}
 
     print('G) levar o backup para OUTRA conta'); ctx2 = b.new_context(viewport={'width': 390, 'height': 844}, accept_downloads=True); p2 = newpage(ctx2)

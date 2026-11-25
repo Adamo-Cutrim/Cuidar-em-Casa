@@ -1,0 +1,34 @@
+name: Lembrete do ensaio de restauracao
+
+# Abre uma tarefa (issue) de 3 em 3 meses lembrando de testar a restauracao do backup; o GitHub avisa por e-mail.
+# Datas: 25 de fevereiro, maio, agosto e novembro (o primeiro ensaio real foi em 25/11/2026).
+on:
+  schedule:
+    - cron: '0 12 25 2,5,8,11 *'     # 12:00 UTC = 09:00 em Brasilia
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  lembrete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Abrir a tarefa (se ja nao houver uma aberta)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          titulo="Ensaio de restauracao do backup ($(date -u +%Y-%m-%d))"
+          abertas=$(gh api "repos/$REPO/issues?state=open&per_page=100" -q '[.[] | select(.pull_request | not) | select(.title | startswith("Ensaio de restauracao do backup"))] | length')
+          if [ "$abertas" != "0" ]; then echo "ja existe um lembrete aberto; nada a fazer"; exit 0; fi
+          corpo="Hora de testar se o backup realmente restaura.
+
+          1. Siga o roteiro: backup/ROTEIRO_RESTAURACAO.md (repositorio publico do projeto, pasta cuidar-em-casa-contexto).
+          2. Tenha a chave privada age em maos (gerenciador de senhas ou papel).
+          3. Use um projeto Supabase novo e descartavel; apague-o no fim.
+          4. Anote a data e o resultado no BACKEND.md do projeto e feche esta tarefa.
+
+          Confira tambem, na aba Actions, se os backups diarios das 02:30 estao com marca verde."
+          gh api "repos/$REPO/issues" -f title="$titulo" -f body="$corpo" -q '"tarefa criada: #" + (.number|tostring)'
