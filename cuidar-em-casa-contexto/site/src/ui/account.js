@@ -95,6 +95,8 @@ async function entrarComSessao(){
   }
   unlock();bumpIdle();
 }
+/* Na tela "Sem conexão", quando a internet volta o app tenta de novo sozinho (v20a). */
+window.addEventListener('online',function(){if(!auth.logged&&auth.mode==='erro') boot();});
 export async function boot(){
   initState();
   showGate('wait');

@@ -17,3 +17,5 @@ import './src/ui/actions.js';
 import {boot} from './src/ui/account.js';
 /* ---------- início ---------- */
 boot();
+/* v20a: o app abre sem internet (só os arquivos do site ficam guardados; dados não). */
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
