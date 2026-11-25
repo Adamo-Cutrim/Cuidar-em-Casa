@@ -269,6 +269,7 @@ body.locked .app,body.locked .tabbar{display:none}
 .imp-sum li{margin-bottom:6px}
 .alert+.notice[data-health-off]{margin-top:10px}
 body.so-consulta #fab{display:none}   /* v20b: sem internet, só consulta */
+body.so-consulta .tabs{grid-template-columns:repeat(4,minmax(0,1fr))}   /* sem o botão do meio, 4 colunas (senão sobra um vazio à direita) */
 .sec.first{margin-top:0;padding-top:0;border-top:0}
 .sec h3{font:650 var(--fs-lg)/1.2 var(--display);padding-top:12px}
 .confirm{display:grid;gap:10px;background:var(--alert-soft);color:var(--alert-ink);border-radius:14px;padding:12px}

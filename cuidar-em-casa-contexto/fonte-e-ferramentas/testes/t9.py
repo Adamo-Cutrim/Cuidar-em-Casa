@@ -83,6 +83,11 @@ with sync_playwright() as p:
     chk('mostra os dois pacientes (a copia estava atualizada)', 'Paciente Sigiloso' in txt and 'Paciente Dois' in txt)
     chk('avisa que esta sem internet e so consulta', 'Sem internet' in pg.locator('#top').inner_text())
     chk('o botao de adicionar some', pg.locator('#fab').count() == 0 or not pg.locator('#fab').is_visible())
+    caixas = pg.evaluate("Array.from(document.querySelectorAll('#tabs .tab')).map(e=>{const r=e.getBoundingClientRect();return [r.left,r.right]})")
+    larg = pg.evaluate('document.documentElement.clientWidth')
+    folga_esq = caixas[0][0]; folga_dir = larg - caixas[-1][1]
+    chk('a barra de baixo fica distribuida na largura toda (sem sobrar vazio a direita)', len(caixas) == 4 and abs(folga_esq - folga_dir) <= 4, [round(x) for c in caixas for x in c] + [larg])
+    chk('os 4 botoes da barra tem a mesma largura', max(c[1] - c[0] for c in caixas) - min(c[1] - c[0] for c in caixas) <= 2)
     pg.locator('#view').get_by_text('Paciente Sigiloso').first.click(); pg.wait_for_timeout(300)
     chk('a ficha abre com o diagnostico', 'Diagnostico reservado' in pg.locator('#sheet-root').inner_text())
     pg.locator('#sheet-root [data-action="edit-patient"]').click(); pg.wait_for_selector('#f-patient'); pg.fill('#p-nome', 'Nome Trocado Offline')
