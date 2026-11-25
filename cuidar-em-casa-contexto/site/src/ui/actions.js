@@ -1,12 +1,12 @@
 /* Tabela de ações (data-action) e ouvintes globais de clique, envio, digitação e teclado. */
-import {addTipo,deleteTipo,findCompany,findPatient,noCompany,repCsv,repText,resolveVisit,visitById} from '../app/model.js';
+import {addTipo,deleteTipo,findCompany,findPatient,hasExamples,noCompany,repCsv,repText,resolveVisit,visitById} from '../app/model.js';
 import {commit} from '../app/persistence.js';
-import {HIDE_KEY,ui,writeLocal} from '../app/state.js';
+import {HEALTH_KEY,HIDE_KEY,ui,writeLocal} from '../app/state.js';
 import {st} from '../app/store.js';
 import {addDays,brToIso,fromIso,iso,startOfWeek} from '../core/dates.js';
 import {norm} from '../core/text.js';
 import {setStatus} from '../domain/visit.js';
-import {boot,doCriar,doEntrar,doNova,doReset,doSenha,openMenu,openPassword,openProfile,openSoon,sair,saveProfile,showGate} from './account.js';
+import {boot,doCriar,doEntrar,doNova,doReset,doSenha,openConfig,openMenu,openPassword,openProfile,openSoon,sair,saveProfile,showGate} from './account.js';
 import {applyImport,backupObject,readBackupFile} from './backup.js';
 import {tipoOptions} from './bits.js';
 import {openCompany,openPatient,openVisit} from './details.js';
@@ -22,6 +22,11 @@ function setWeek(start){
   ui.weekStart=iso(start);
   ui.day=iso(addDays(start,off));
   renderAll();
+}
+function clearDemo(){
+  st.S.patients=st.S.patients.filter(x=>!x.ex);st.S.companies=st.S.companies.filter(x=>!x.ex);st.S.visits=st.S.visits.filter(x=>!x.ex);
+  if(ui.fcomp!=='all'&&ui.fcomp!=='none'&&!findCompany(ui.fcomp)) ui.fcomp='all';
+  commit();renderAll();toast('Exemplos apagados.');
 }
 const A={
   'tab':function(el){ui.tab=el.dataset.tab;renderAll();window.scrollTo(0,0);},
@@ -84,6 +89,7 @@ const A={
   'menu-go':function(el){
     const g=el.dataset.go;
     if(g==='perfil') openProfile();
+    else if(g==='config') openConfig();
     else if(g==='atend'){closeSheet(true);st.lastFocus=null;ui.tab='tipos';renderAll();window.scrollTo(0,0);}
     else if(g==='fatur'){repInit({by:'paciente',emp:'all',pac:'all'});openReport();}
     else openSoon(g);
@@ -147,10 +153,14 @@ const A={
   'ask':function(el){const c=document.getElementById(el.dataset.confirm);if(c){c.hidden=false;el.hidden=true;}},
   'unask':function(el){const c=document.getElementById(el.dataset.confirm),a=document.getElementById(el.dataset.ask);if(c) c.hidden=true;if(a) a.hidden=false;},
   'copy':function(el){copyText(el.dataset.text);},
-  'clear-demo':function(){
-    st.S.patients=st.S.patients.filter(x=>!x.ex);st.S.companies=st.S.companies.filter(x=>!x.ex);st.S.visits=st.S.visits.filter(x=>!x.ex);
-    if(ui.fcomp!=='all'&&ui.fcomp!=='none'&&!findCompany(ui.fcomp)) ui.fcomp='all';
-    commit();renderAll();toast('Exemplos apagados.');
+  'clear-demo':function(){clearDemo();},
+  'clear-demo-config':function(){if(hasExamples()) clearDemo();openConfig();},
+  'health-show':function(){   /* revela os dados de saúde só nesta ficha; ao reabrir, voltam a ficar cobertos */
+    const r=$('#sheet-root');if(!r) return;
+    const first=r.querySelector('[data-health]');
+    r.querySelectorAll('[data-health]').forEach(function(x){x.hidden=false;});
+    r.querySelectorAll('[data-health-off]').forEach(function(x){x.remove();});
+    if(first){first.setAttribute('tabindex','-1');first.focus();}
   },
   'open-cal':function(el){const w=el.closest('.datef');if($('.cal',w).hidden) calOpen(w);else calClose(w,false);},
   'cal-nav':function(el){
@@ -213,6 +223,7 @@ document.addEventListener('input',function(e){
 });
 document.addEventListener('change',function(e){
   const t=e.target;
+  if(t&&t.dataset&&t.dataset.role==='cfg-saude'){st.hideHealth=t.checked;writeLocal(HEALTH_KEY,t.checked?'1':'0');return;}
   if(t&&t.dataset&&t.dataset.role==='import-file'){const f=t.files&&t.files[0];t.value='';readBackupFile(f);return;}
   if(t&&t.dataset&&t.dataset.role==='rep-emp'){
     ui.rep.emp=t.value;

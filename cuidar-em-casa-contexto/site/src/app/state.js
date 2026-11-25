@@ -2,6 +2,7 @@
 import {iso,startOfWeek} from '../core/dates.js';
 /* ---------- estado e armazenamento ---------- */
 export const HIDE_KEY='cuidar-em-casa:ocultar-valores';
+export const HEALTH_KEY='cuidar-em-casa:ocultar-saude';   /* Configurações: esconder dados de saúde (só neste aparelho) */
 export const SB_URL='https://ynbqblvdtgwabczbssfp.supabase.co', SB_KEY='sb_publishable_Tuay0Raxi1UIqQLi1pNrcA_hqdThXOV', SB_SES='cuidar-em-casa:sb';
 export const ui={tab:'agenda',weekStart:iso(startOfWeek(new Date())),day:iso(new Date()),q:'',fcomp:'all'};
 export const auth={conta:null,logged:false,mode:'',msg:'',email:''};

@@ -265,6 +265,8 @@ body.locked .app,body.locked .tabbar{display:none}
 .sec{margin-top:18px;padding-top:6px;border-top:1px solid var(--line)}
 .imp-sum{margin:0 0 12px;padding-left:20px}
 .imp-sum li{margin-bottom:6px}
+.alert+.notice[data-health-off]{margin-top:10px}
+.sec.first{margin-top:0;padding-top:0;border-top:0}
 .sec h3{font:650 var(--fs-lg)/1.2 var(--display);padding-top:12px}
 .confirm{display:grid;gap:10px;background:var(--alert-soft);color:var(--alert-ink);border-radius:14px;padding:12px}
 .confirm[hidden]{display:none}

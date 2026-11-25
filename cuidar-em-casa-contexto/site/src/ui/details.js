@@ -7,15 +7,24 @@ import {avatar,chip,exTag,mapsUrl,money} from './bits.js';
 import {ic} from './dom.js';
 import {dayTitle} from './fields.js';
 import {askBlock,kv,kvCopy,openSheet} from './sheet.js';
+/* Configurações > Esconder dados de saúde: condições, medicamentos e o nome da alergia ficam cobertos até tocar em Mostrar.
+   O aviso vermelho de alergia continua aparecendo (o profissional precisa saber que existe uma alergia). */
+const kvH=(label,html)=>st.hideHealth?kv(label,html).replace(/^<div>/,'<div data-health hidden>'):kv(label,html);
+function alergiaAlert(p){
+  if(!p||!p.alergias) return '';
+  if(!st.hideHealth) return '<p class="alert"><strong>Alergias:</strong> '+esc(p.alergias)+'</p>';
+  return '<p class="alert"><strong>Alergias:</strong> <span data-health-off>registradas. Toque em Mostrar para ver.</span><span data-health hidden>'+esc(p.alergias)+'</span></p>';
+}
+const healthNote=has=>st.hideHealth&&has?'<div class="notice" data-health-off><p>Dados de saúde escondidos nesta tela.</p><button type="button" class="btn small" data-action="health-show" aria-label="Mostrar dados de saúde">'+ic('eye')+'Mostrar</button></div>':'';
 export function openVisit(id){
   const v=visitById(id);if(!v) return;
   const p=findPatient(v.pacienteId);
   const d=fromIso(v.date);
   const addr=p?[p.endereco,p.bairro].filter(Boolean).join(', '):'';
-  const st={agendado:'Agendado',feito:'Realizado',cancelado:'Cancelado'}[v.status];
+  const lbl={agendado:'Agendado',feito:'Realizado',cancelado:'Cancelado'}[v.status];
   let b='<div class="sum">'+(p?avatar(p,'lg'):'')+'<div><h3>'+esc(p?p.nome:'Paciente removido')+'</h3><p>'+esc(dayTitle(d))+' às '+esc(v.hora)+'</p></div></div>'+
-    '<p><span class="badge '+v.status+'">'+st+'</span> <span class="lead">'+esc(v.tipo||'Atendimento')+'</span></p>';
-  if(p&&p.alergias) b+='<p class="alert"><strong>Alergias:</strong> '+esc(p.alergias)+'</p>';
+    '<p><span class="badge '+v.status+'">'+lbl+'</span> <span class="lead">'+esc(v.tipo||'Atendimento')+'</span></p>';
+  b+=alergiaAlert(p)+healthNote(!!(p&&p.alergias));
   if(v.serie) b+='<p class="hint">Este atendimento se repete toda semana. Para mudar os dias ou o horário, edite o cadastro do paciente.</p>';
   b+='<div class="panel kv">';
   if(p) b+=kv('Empresa',chip(p.empresaId));
@@ -41,7 +50,7 @@ export function openPatient(id){
   const ups=visitsBetween(iso(new Date()),iso(addDays(new Date(),120))).filter(v=>v.pacienteId===id&&v.status==='agendado'&&(v.date+' '+v.hora)>=key).sort((x,y)=>(x.date+x.hora).localeCompare(y.date+y.hora)).slice(0,4);
   let b='<div class="sum">'+avatar(p,'lg')+'<div><h3>'+esc(p.nome)+exTag(p)+'</h3><p>'+(a!=null?a+' anos':'Idade não informada')+'</p></div></div>'+
     '<p>'+chip(p.empresaId)+'</p>';
-  if(p.alergias) b+='<p class="alert"><strong>Alergias:</strong> '+esc(p.alergias)+'</p>';
+  b+=alergiaAlert(p)+healthNote(!!(p.alergias||p.condicoes||p.medicamentos));
   b+='<div class="panel kv"><div><div class="grow"><span class="k">Valor por atendimento</span><div class="v">'+money(p.valor)+'</div></div><button type="button" class="icon-btn sm" data-action="toggle-hide-sheet" data-id="'+p.id+'" aria-label="'+(st.hide?'Mostrar valores':'Ocultar valores')+'">'+ic(st.hide?'eye':'eye-off')+'</button></div>'+(p.rec&&p.rec.ativo?kv('Atendimento recorrente',esc(recText(p))):'');
   if(addr) b+=kvCopy('Endereço',addr,'<a href="'+mapsUrl(addr)+'" target="_blank" rel="noopener noreferrer">'+ic('external')+'Abrir no mapa</a>','Copiar endereço');
   if(p.ref) b+=kv('Como chegar e acessar',esc(p.ref));
@@ -51,10 +60,10 @@ export function openPatient(id){
   if(p.respNome) c+=kvCopy('Responsável',p.respNome+(p.respTel?', '+p.respTel:''),'','Copiar contato do responsável');
   if(c) b+='<div class="panel kv">'+c+'</div>';
   let h='';
-  if(p.condicoes) h+=kv('Condições e diagnóstico',esc(p.condicoes));
-  if(p.medicamentos) h+=kv('Medicamentos em uso',esc(p.medicamentos));
+  if(p.condicoes) h+=kvH('Condições e diagnóstico',esc(p.condicoes));
+  if(p.medicamentos) h+=kvH('Medicamentos em uso',esc(p.medicamentos));
   if(p.obs) h+=kv('Observações importantes',esc(p.obs));
-  if(h) b+='<div class="panel kv">'+h+'</div>';
+  if(h) b+='<div class="panel kv"'+(st.hideHealth&&!p.obs?' data-health hidden':'')+'>'+h+'</div>';   /* painel só com dados escondidos não aparece vazio */
   if(ups.length){
     b+='<div class="panel"><ul class="ups">'+ups.map(function(v){const d=fromIso(v.date);return '<li><span>'+WD[d.getDay()]+', '+pad(d.getDate())+'/'+pad(d.getMonth()+1)+' às '+esc(v.hora)+'</span><span>'+esc(v.tipo||'Atendimento')+'</span></li>';}).join('')+'</ul></div>';
   }
