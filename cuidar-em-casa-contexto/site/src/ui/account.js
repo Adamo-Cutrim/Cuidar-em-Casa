@@ -200,7 +200,7 @@ export function openProfile(){
     '<label for="pf-reg">Registro profissional</label><input id="pf-reg" name="registro" maxlength="'+LIM.registro+'" placeholder="Ex.: COREN 000000" value="'+val(pf.registro)+'">'+
     '<label for="pf-cid">Cidade ou região de atuação</label><input id="pf-cid" name="cidade" maxlength="'+LIM.cidade+'" value="'+val(pf.cidade)+'">'+
     '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Salvar perfil</button></div></form>'+
-    '<div class="sec"><h3>Seus dados</h3><p class="hint">O backup é um arquivo com todos os seus pacientes, empresas e atendimentos (sem os dados de exemplo). Guarde em local seguro: ele não tem senha. Restaurar acrescenta ao que você já tem; nada é apagado nem sobrescrito.</p><div class="sheet-actions"><button type="button" class="btn" data-action="backup">'+ic('download')+'Baixar backup (JSON)</button><button type="button" class="btn" data-action="import-pick">'+ic('upload')+'Restaurar backup (JSON)</button><input type="file" id="imp-file" data-role="import-file" accept="application/json,.json" hidden></div></div>'+
+    '<div class="sec"><h3>Seus dados</h3><p class="hint">Seus dados ficam salvos na sua conta e são copiados automaticamente todos os dias, de forma protegida. Você não precisa fazer nada.</p></div>'+
     '<div class="sec"><h3>Segurança</h3><div class="sheet-actions"><button type="button" class="btn" data-action="open-password">'+ic('lock')+'Alterar senha</button><button type="button" class="btn" data-action="logout">'+ic('logout')+'Sair da conta</button></div></div>'+
     '<div class="sheet-actions"><button type="button" class="btn ghost" data-action="open-menu">Voltar ao menu</button></div>';
   openSheet('Perfil',b);
