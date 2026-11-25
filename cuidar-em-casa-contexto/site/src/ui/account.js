@@ -1,5 +1,4 @@
 /* Conta e acesso: entrar, criar conta, recuperar senha, menu, perfil, trocar senha, sair. */
-import {MAX_ERROS,abrirComPin as abrirCopiaComPin,apagarCopia,aparelho,ativar as ativarAparelho,ativo as aparelhoAtivo,atualizarCopia,copiaDe,esquecerSegredo,lerEstado,trocarPin as trocarPinAparelho} from '../app/aparelho.js';
 import {makeDemo} from '../app/catalog.js';
 import {hasExamples,tiposList} from '../app/model.js';
 import {bumpIdle,commit,esperaGravar,idleT,initState,loadAll} from '../app/persistence.js';
@@ -7,7 +6,6 @@ import {SB,api,clearSes,readSes,sbSignIn,sbSignUp,storeSes} from '../app/session
 import {auth,ui,wipeAppStorage} from '../app/state.js';
 import {st} from '../app/store.js';
 import {LIM} from '../core/limits.js';
-import {pinValido} from '../data/cofre.js';
 import {cleanName,esc,initials} from '../core/text.js';
 import {errMsg,nowSec,readHashSession} from '../data/supabase.js';
 import {emptySnap} from '../data/sync.js';
@@ -43,12 +41,6 @@ function renderGate(){
   }else if(m==='erro'){
     h+='<h1 id="gate-h" tabindex="-1">Sem conexão</h1><p class="sub">Não foi possível abrir seus dados agora.</p>'+msg+
       '<div class="sheet-actions"><button type="button" class="btn primary" data-action="auth-retry">Tentar de novo</button><button type="button" class="btn" data-action="logout">Sair</button></div>';
-  }else if(m==='pin'){
-    h+='<h1 id="gate-h" tabindex="-1">Sem internet</h1><p class="sub">Digite o PIN deste aparelho para ver seus dados. '+esc(copiaDe())+'</p>'+msg+
-      '<form id="f-pin" class="gate-form" novalidate><label for="pin-campo">PIN (6 números)</label><input id="pin-campo" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off">'+
-      '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Abrir</button><button type="button" class="btn" data-action="auth-retry">Tentar com internet</button></div></form>'+
-      '<p class="hint">Esqueceu o PIN? Com internet, entre com e-mail e senha e crie outro em Configurações.</p>';
-    auth.msg='';
   }else if(m==='confirma'){
     h+='<h1 id="gate-h" tabindex="-1">Confirme seu e-mail</h1><p class="sub">Enviamos um link para <strong>'+esc(auth.email)+'</strong>. Abra o e-mail, toque no link e depois entre aqui. Olhe também a caixa de spam.</p>'+
       '<div class="sheet-actions"><button type="button" class="btn primary" data-action="auth-back">Ir para o login</button></div>';
@@ -74,8 +66,7 @@ function renderGate(){
       '<form id="f-entrar" class="gate-form" novalidate><label for="a-email">E-mail</label><input id="a-email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" maxlength="120">'+
       pwField('a-senha','senha','Senha','current-password')+
       '<label class="check" for="a-manter"><input id="a-manter" name="manter" type="checkbox"><span>Manter conectado neste aparelho</span></label>'+
-      '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Entrar</button><button type="button" class="btn" data-action="auth-create">Criar conta</button><button type="button" class="btn ghost" data-action="auth-forgot">Esqueci a senha</button></div></form>'+
-      (aparelhoAtivo()?'<div class="sheet-actions"><button type="button" class="btn" data-action="pin-abrir">Sem internet? Abrir com o PIN</button></div>':'');
+      '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Entrar</button><button type="button" class="btn" data-action="auth-create">Criar conta</button><button type="button" class="btn ghost" data-action="auth-forgot">Esqueci a senha</button></div></form>';
     auth.msg='';
   }
   g.innerHTML=h+'</div>';
@@ -99,19 +90,15 @@ async function entrarComSessao(){
   try{await loadAll();}
   catch(e){
     if(e&&e.code==='expired'){clearSes();auth.msg='Sua sessão expirou. Entre de novo.';return showGate('entrar');}
-    if(e&&e.code==='network'&&aparelhoAtivo()) return showGate('pin');
     auth.msg=errMsg(e,'Não foi possível carregar seus dados. Tente de novo.');
     return showGate('erro');
   }
-  if(aparelho.cofre&&aparelho.cofre.usuario!==SB.ses.user.id) await apagarCopia();   /* cópia de outra conta não fica */
-  unlock();bumpIdle();atualizarCopia();
+  unlock();bumpIdle();
 }
 /* Na tela "Sem conexão", quando a internet volta o app tenta de novo sozinho (v20a). */
-window.addEventListener('online',function(){if((!auth.logged&&auth.mode==='erro')||(st.offline&&readSes())) boot();});
+window.addEventListener('online',function(){if(!auth.logged&&auth.mode==='erro') boot();});
 export async function boot(){
-  st.offline=false;st.offlineJson='';st.chaveAparelho=null;document.body.classList.remove('so-consulta');
   initState();
-  await lerEstado();
   showGate('wait');
   const hs=readHashSession(location,history);
   try{
@@ -127,7 +114,7 @@ export async function boot(){
     }
     if(SB.ses){await entrarComSessao();return;}
   }catch(e){
-    if(e&&e.code==='network'){if(aparelhoAtivo()) return showGate('pin');auth.msg=errMsg(e);return showGate('erro');}
+    if(e&&e.code==='network'){auth.msg=errMsg(e);return showGate('erro');}
     clearSes();
   }
   showGate('entrar');
@@ -228,78 +215,6 @@ export function saveProfile(f){
   commit();closeSheet(true);st.lastFocus=null;
   toast('Perfil atualizado.');
 }
-/* ---------- v20b: consultar sem internet com o PIN ---------- */
-export async function doPin(f){
-  const pin=fv(f,'pin');
-  if(!pinValido(pin)) return fail(f,'O PIN tem 6 números.','pin');
-  setBusy(f,true);
-  let r;
-  try{r=await abrirCopiaComPin(pin);}
-  catch(e){setBusy(f,false);return fail(f,'Não foi possível abrir a cópia deste aparelho.','pin');}
-  if(r.ok) return entrarOffline(r);
-  setBusy(f,false);
-  if(r.erro==='pin'){f.elements.pin.value='';return fail(f,'PIN incorreto. '+(r.restantes===1?'Resta 1 tentativa':'Restam '+r.restantes+' tentativas')+' antes de a cópia deste aparelho ser apagada.','pin');}
-  auth.msg=r.erro==='apagada'?'Foram '+MAX_ERROS+' tentativas erradas: a cópia deste aparelho foi apagada. Seus dados continuam na conta; com internet, entre com e-mail e senha.':'Este aparelho não tem uma cópia dos seus dados. Com internet, entre com e-mail e senha.';
-  showGate(readSes()?'erro':'entrar');
-}
-function entrarOffline(r){
-  st.offline=true;st.offlineJson=JSON.stringify(r.dados.S);
-  st.S=r.dados.S;st.snap=emptySnap();auth.conta=r.dados.conta;
-  ui.tab='agenda';ui.q='';ui.fcomp='all';
-  document.body.classList.add('so-consulta');
-  unlock();bumpIdle();
-}
-/* 15 minutos sem uso sem internet: tira os dados da tela e da memória e pede o PIN de novo. */
-export function travarOffline(){
-  if(!st.offline) return;
-  closeSheet(true);
-  st.offline=false;st.offlineJson='';st.chaveAparelho=null;
-  st.S=makeDemo();auth.logged=false;auth.conta=null;
-  document.body.classList.remove('so-consulta');
-  ['#top','#view','#tabs','#fab'].forEach(function(s){const e=$(s);if(e) e.innerHTML='';});
-  auth.msg='O app travou depois de 15 minutos sem uso.';
-  showGate('pin');
-}
-/* Sair (botão): apaga a cópia do aparelho. Saídas automáticas (inatividade, sessão expirada) não apagam. */
-export async function sairDaConta(){await apagarCopia();esquecerSegredo();return sair();}
-function secOffline(){
-  let b='<div class="sec"><h3>Usar sem internet neste aparelho</h3>';
-  if(st.offline) return b+'<p class="hint">Conecte-se à internet para mudar esta opção.</p></div>';
-  if(!aparelhoAtivo()) return b+'<p class="hint">Guarda uma cópia cifrada dos seus dados neste aparelho para consultar sem internet, com um PIN de 6 números. Com internet o app não pede o PIN. Não ative em aparelho compartilhado.</p>'+
-    '<div class="sheet-actions"><button type="button" class="btn" data-action="offline-ativar">Ativar com um PIN</button></div></div>';
-  return b+'<p class="hint"><strong>Ativo neste aparelho.</strong> '+esc(copiaDe())+' Sem internet, o app pede o PIN e mostra os dados só para consulta.</p>'+
-    '<div class="sheet-actions"><button type="button" class="btn" data-action="offline-trocar">Trocar o PIN</button>'+
-    askBlock('offline','Desativar e apagar a cópia deste aparelho? Seus dados continuam na conta.','offline-desativar','','Desativar neste aparelho')+'</div></div>';
-}
-export function openOffline(modo){
-  const trocar=modo==='trocar';
-  const b='<form id="f-offline" novalidate data-modo="'+(trocar?'trocar':'ativar')+'">'+
-    '<p class="hint">'+(trocar?'Crie o novo PIN deste aparelho. O antigo deixa de funcionar.':'Com internet nada muda. Sem internet, o app pede este PIN e mostra seus dados só para consulta.')+' Depois de '+MAX_ERROS+' erros seguidos, a cópia deste aparelho é apagada (seus dados continuam na conta).</p>'+
-    pwField('of-pin','pin','PIN (6 números)','off').replace('type="password"','type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6"')+
-    pwField('of-conf','conf','Repita o PIN','off').replace('type="password"','type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6"')+
-    '<label class="check" for="of-bloq"><input type="checkbox" id="of-bloq" name="bloq"><span>Meu celular tem bloqueio de tela (senha, digital ou desenho)</span></label>'+
-    '<p class="hint">O PIN impede que alguém com o celular na mão abra os dados pelo app. O bloqueio de tela é o que protege se alguém tentar copiar os arquivos do aparelho.</p>'+
-    '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">'+(trocar?'Salvar novo PIN':'Ativar')+'</button>'+
-    '<button type="button" class="btn" data-action="menu-go" data-go="config">Voltar às configurações</button></div></form>';
-  openSheet(trocar?'Trocar o PIN':'Usar sem internet',b);
-}
-export async function doOffline(f){
-  const p1=fv(f,'pin'),p2=fv(f,'conf');
-  if(!pinValido(p1)) return fail(f,'O PIN precisa ter exatamente 6 números.','pin');
-  if(p1!==p2) return fail(f,'Os dois PINs não são iguais.','conf');
-  if(!f.elements.bloq.checked) return fail(f,'Ative o bloqueio de tela do celular e marque a confirmação. Sem ele, quem pegar o aparelho chega mais perto dos dados.','bloq');
-  setBusy(f,true);
-  try{
-    if(f.dataset.modo==='trocar') await trocarPinAparelho(p1);else await ativarAparelho(p1);
-  }catch(e){
-    setBusy(f,false);
-    return fail(f,(e&&(e.code==='network'||e.code==='expired'))?'Precisa de internet para '+(f.dataset.modo==='trocar'?'trocar o PIN.':'ativar.'):'Não foi possível '+(f.dataset.modo==='trocar'?'trocar o PIN.':'ativar.')+' Tente de novo.','pin');
-  }
-  closeSheet(true);st.lastFocus=null;
-  toast(f.dataset.modo==='trocar'?'PIN trocado.':'Pronto: sem internet, abra o app com o PIN.');
-}
-export async function desativarOffline(){await apagarCopia();openConfig();toast('Cópia deste aparelho apagada.');}
-
 /* Configurações: preferências que valem só neste aparelho e ações sobre os dados da conta. */
 export function openConfig(){
   const ex=hasExamples();
@@ -309,7 +224,6 @@ export function openConfig(){
     '<div class="sec"><h3>Dados de exemplo</h3>'+
     (ex?'<p class="hint">São os pacientes, empresas e atendimentos que vêm prontos para você conhecer o app. Eles nunca são salvos na sua conta.</p><div class="sheet-actions">'+askBlock('demo','Apagar todos os dados de exemplo? Os seus próprios cadastros não mudam.','clear-demo-config','','Apagar dados de exemplo')+'</div>'
       :'<p class="hint">Não há dados de exemplo nesta conta.</p>')+'</div>'+
-    secOffline()+
     '<div class="sec"><h3>Conta</h3><p class="hint">Apaga a sua conta e todos os seus dados, para sempre.</p><div class="sheet-actions"><button type="button" class="btn danger" data-action="open-excluir">Excluir minha conta</button></div></div>'+
     '<div class="sheet-actions"><button type="button" class="btn ghost" data-action="open-menu">Voltar ao menu</button></div>';
   openSheet('Configurações',b);
@@ -344,7 +258,7 @@ export async function doExcluir(f){
   try{await esperaGravar();}catch(e){}   /* grava o que estiver pendente: se a exclusão falhar, nada se perde */
   try{await api('/rest/v1/rpc/excluir_minha_conta',{method:'POST',body:{}});}
   catch(e){setBusy(f,false);return fail(f,'Não foi possível excluir a conta agora. Nada foi apagado. Tente de novo.','senha');}
-  clearTimeout(st.saveTimer);st.saveTimer=null;clearSes();wipeAppStorage();await apagarCopia();esquecerSegredo();
+  clearTimeout(st.saveTimer);st.saveTimer=null;clearSes();wipeAppStorage();
   await sair('Sua conta e todos os seus dados foram excluídos.',true);
   wipeAppStorage();
 }

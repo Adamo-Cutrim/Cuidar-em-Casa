@@ -4,9 +4,6 @@ export const st={
   S:null,
   hide:false,
   hideHealth:false,
-  offline:false,        /* v20b: abrindo a cópia do aparelho, sem internet (só consulta) */
-  offlineJson:'',       /* os dados como vieram da cópia, para desfazer qualquer tentativa de alteração */
-  chaveAparelho:null,   /* chave da cópia aberta: só na memória */
   saveTimer:null,
   retryTimer:null,
   retryN:0,
