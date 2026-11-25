@@ -1,6 +1,6 @@
 /* Conta e acesso: entrar, criar conta, recuperar senha, menu, perfil, trocar senha, sair. */
 import {makeDemo} from '../app/catalog.js';
-import {tiposList} from '../app/model.js';
+import {hasExamples,tiposList} from '../app/model.js';
 import {bumpIdle,commit,esperaGravar,idleT,initState,loadAll} from '../app/persistence.js';
 import {SB,api,clearSes,readSes,sbSignIn,sbSignUp,storeSes} from '../app/session.js';
 import {auth,ui} from '../app/state.js';
@@ -11,7 +11,7 @@ import {errMsg,nowSec,readHashSession} from '../data/supabase.js';
 import {emptySnap} from '../data/sync.js';
 import {$,ic} from './dom.js';
 import {fail,val} from './forms.js';
-import {closeSheet,openSheet,toast} from './sheet.js';
+import {askBlock,closeSheet,openSheet,toast} from './sheet.js';
 import {renderAll} from './views.js';
 /* ---------- conta e acesso ----------
    O login é do Supabase Auth: a senha nunca fica neste aparelho nem neste código. */
@@ -212,6 +212,18 @@ export function saveProfile(f){
   if(auth.conta) auth.conta.nome=nome;
   commit();closeSheet(true);st.lastFocus=null;
   toast('Perfil atualizado.');
+}
+/* Configurações: preferências que valem só neste aparelho e ações sobre os dados da conta. */
+export function openConfig(){
+  const ex=hasExamples();
+  const b='<div class="sec first"><h3>Privacidade na tela</h3>'+
+    '<label class="check" for="cfg-saude"><input type="checkbox" id="cfg-saude" data-role="cfg-saude" aria-describedby="cfg-saude-h"'+(st.hideHealth?' checked':'')+'><span>Esconder dados de saúde</span></label>'+
+    '<p class="hint" id="cfg-saude-h">Condições, medicamentos e o nome da alergia ficam cobertos na ficha do paciente e do atendimento até você tocar em Mostrar. O aviso de que existe alergia continua aparecendo. Vale só neste aparelho.</p></div>'+
+    '<div class="sec"><h3>Dados de exemplo</h3>'+
+    (ex?'<p class="hint">São os pacientes, empresas e atendimentos que vêm prontos para você conhecer o app. Eles nunca são salvos na sua conta.</p><div class="sheet-actions">'+askBlock('demo','Apagar todos os dados de exemplo? Os seus próprios cadastros não mudam.','clear-demo-config','','Apagar dados de exemplo')+'</div>'
+      :'<p class="hint">Não há dados de exemplo nesta conta.</p>')+'</div>'+
+    '<div class="sheet-actions"><button type="button" class="btn ghost" data-action="open-menu">Voltar ao menu</button></div>';
+  openSheet('Configurações',b);
 }
 export function openSoon(kind){
   const t=kind==='notif'?{h:'Notificações',s:'Aqui ficarão os avisos e lembretes dos seus atendimentos.'}:{h:'Configurações',s:'Aqui ficarão as preferências do app.'};

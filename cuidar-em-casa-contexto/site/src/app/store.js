@@ -3,6 +3,7 @@ import {emptySnap} from '../data/sync.js';
 export const st={
   S:null,
   hide:false,
+  hideHealth:false,
   saveTimer:null,
   retryTimer:null,
   retryN:0,

@@ -55,9 +55,9 @@ export function clearMove(f){
   const c=f.querySelector('#move-confirm'),a=f.querySelector('.sheet-actions');
   if(c) c.hidden=true;if(a) a.hidden=false;delete f.dataset.moveOk;
 }
-export function askBlock(id,msg,action,dataId){
-  return '<button type="button" class="btn danger" id="ask-'+id+'" data-action="ask" data-confirm="cf-'+id+'">Excluir</button>'+
-    '<div class="confirm" id="cf-'+id+'" hidden><p>'+msg+'</p><div class="two"><button type="button" class="btn danger" data-action="'+action+'" data-id="'+dataId+'">Excluir</button><button type="button" class="btn" data-action="unask" data-confirm="cf-'+id+'" data-ask="ask-'+id+'">Manter</button></div></div>';
+export function askBlock(id,msg,action,dataId,label='Excluir'){
+  return '<button type="button" class="btn danger" id="ask-'+id+'" data-action="ask" data-confirm="cf-'+id+'">'+label+'</button>'+
+    '<div class="confirm" id="cf-'+id+'" hidden><p>'+msg+'</p><div class="two"><button type="button" class="btn danger" data-action="'+action+'" data-id="'+dataId+'">'+label+'</button><button type="button" class="btn" data-action="unask" data-confirm="cf-'+id+'" data-ask="ask-'+id+'">Manter</button></div></div>';
 }
 export function kv(label,html,extra){
   return '<div><div class="grow"><span class="k">'+label+'</span><div class="v">'+html+'</div>'+(extra||'')+'</div></div>';

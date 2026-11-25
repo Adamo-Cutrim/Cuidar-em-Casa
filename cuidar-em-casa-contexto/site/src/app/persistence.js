@@ -9,10 +9,11 @@ import {toast} from '../ui/sheet.js';
 import {renderAll} from '../ui/views.js';
 import {makeDemo} from './catalog.js';
 import {SB,api} from './session.js';
-import {HIDE_KEY,auth,readLocal} from './state.js';
+import {HEALTH_KEY,HIDE_KEY,auth,readLocal} from './state.js';
 import {st} from './store.js';
 export function initState(){
   st.hide=readLocal(HIDE_KEY)==='1';
+  st.hideHealth=readLocal(HEALTH_KEY)==='1';
   st.S=makeDemo();
 }
 const pending=()=>!!(st.saveTimer||st.writing||st.dirty);
