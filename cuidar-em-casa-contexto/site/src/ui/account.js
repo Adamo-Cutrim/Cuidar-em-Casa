@@ -46,13 +46,13 @@ function renderGate(){
       '<div class="sheet-actions"><button type="button" class="btn primary" data-action="auth-back">Ir para o login</button></div>';
   }else if(m==='nova'){
     h+='<h1 id="gate-h" tabindex="-1">Nova senha</h1><p class="sub">Crie a nova senha da sua conta.</p>'+
-      '<form id="f-nova" class="gate-form" novalidate>'+pwField('a-senha','senha','Nova senha','new-password')+'<p class="hint">Use pelo menos 8 caracteres.</p>'+pwField('a-conf','conf','Repita a nova senha','new-password')+
+      '<form id="f-nova" class="gate-form" novalidate>'+pwField('a-senha','senha','Nova senha','new-password')+'<p class="hint">Use pelo menos 8 caracteres, com letras maiúsculas e minúsculas, números e símbolos.</p>'+pwField('a-conf','conf','Repita a nova senha','new-password')+
       '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Salvar nova senha</button></div></form>';
   }else if(m==='criar'){
     h+='<h1 id="gate-h" tabindex="-1">Criar conta</h1><p class="sub">Crie uma conta para guardar os dados dos seus pacientes com segurança.</p>'+
       '<form id="f-criar" class="gate-form" novalidate><label for="a-nome">Seu nome</label><input id="a-nome" name="nome" autocomplete="name" maxlength="80">'+
       '<label for="a-email">E-mail</label><input id="a-email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" maxlength="120">'+
-      pwField('a-senha','senha','Senha','new-password')+'<p class="hint">Use pelo menos 8 caracteres.</p>'+
+      pwField('a-senha','senha','Senha','new-password')+'<p class="hint">Use pelo menos 8 caracteres, com letras maiúsculas e minúsculas, números e símbolos.</p>'+
       pwField('a-conf','conf','Repita a senha','new-password')+
       '<label class="check" for="a-manter"><input id="a-manter" name="manter" type="checkbox"><span>Manter conectado neste aparelho</span></label>'+
       '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Criar conta</button><button type="button" class="btn" data-action="auth-back">Já tenho conta</button></div></form>'+
@@ -219,7 +219,7 @@ export function openSoon(kind){
 }
 export function openPassword(){
   const b='<form id="f-senha" novalidate>'+pwField('s-atual','atual','Senha atual','current-password')+pwField('s-nova','senha','Nova senha','new-password')+pwField('s-conf','conf','Repita a nova senha','new-password')+
-    '<p class="hint">Use pelo menos 8 caracteres.</p><p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Salvar nova senha</button><button type="button" class="btn" data-action="menu-go" data-go="perfil">Voltar ao perfil</button></div></form>';
+    '<p class="hint">Use pelo menos 8 caracteres, com letras maiúsculas e minúsculas, números e símbolos.</p><p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Salvar nova senha</button><button type="button" class="btn" data-action="menu-go" data-go="perfil">Voltar ao perfil</button></div></form>';
   openSheet('Alterar senha',b);
 }
 export async function doSenha(f){
