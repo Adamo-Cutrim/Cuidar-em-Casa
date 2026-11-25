@@ -52,9 +52,17 @@ O assistente tem 9 etapas e te diz exatamente o que clicar em cada uma: confere 
    scripts/restaurar.sh ARQUIVO.tar.gz.age CHAVE_PRIVADA.txt "URL_DO_PROJETO_NOVO"
    ```
    O script **nunca sobrescreve**: recusa um destino que já tenha tabelas. Ele recria as contas (mesmos ids e e-mails), restaura as tabelas e **confere as contagens**.
+   Depois **reaplica as permissões** (o backup não leva permissões: sem isso as tabelas voltariam abertas demais ou o app receberia `permission denied`) e confere que `anon` não lê nada e que o usuário logado só tem select/insert/update/delete.
 4. Aponte o app para o projeto novo (URL e chave pública) e peça às pessoas que entrem por **"Esqueci a senha"**: **as senhas não vão no backup**.
 
 **Rotina:** teste a restauração a cada 3 meses num projeto descartável. Um backup que nunca foi restaurado não é garantia.
+
+## Revisão de 25/11/2026 (correções aplicadas)
+
+- **Permissões na restauração:** `restaurar.sh` ganhou o passo 6/7 (reaplica e confere as permissões). O SQL foi ensaiado no banco de testes, numa transação desfeita: de 7 tabelas abertas para `anon`/`authenticated` passou a 0 com permissão errada.
+- **Contagens consistentes:** `fazer-backup.sh` só aceita a cópia se as contagens de antes e depois do `pg_dump` forem iguais (até 3 tentativas, com 20 s entre elas); se o banco não ficar quieto, falha sem guardar nada. Ensaiado com ferramentas simuladas (estável: guarda; instável: falha após 3 tentativas). **Não ensaiado contra um PostgreSQL de verdade** (sem Docker nesta máquina): rodar `bash backup/ensaio-local.sh` onde houver Docker.
+- **Ações do GitHub presas ao commit** (`checkout` v4.4.0 e `upload-artifact` v4.6.2), para uma atualização maliciosa não rodar com os segredos do banco. Atualizar de tempos em tempos, escolhendo o commit da versão nova.
+- **Acompanhar na hora:** limpar o histórico da área de transferência do Windows (Win+V) depois da etapa do usuário de leitura; olhar o `ultimo-backup.txt` do repositório privado de vez em quando (não há alerta de "backup parado"); a recriação das contas ainda não foi testada num Supabase real (cobre o teste de restauração obrigatório).
 
 ## O que foi verificado e o que NÃO foi
 

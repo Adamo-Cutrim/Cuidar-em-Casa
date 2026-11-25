@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Baixar o repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0 (preso ao commit: uma atualizacao maliciosa da acao nao roda com os segredos)
 
       - name: Instalar o cliente PostgreSQL 17 e o age
         run: |
@@ -38,7 +38,7 @@ jobs:
         run: bash scripts/fazer-backup.sh
 
       - name: Guardar o arquivo cifrado
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: backup-${{ github.run_id }}
           path: saida/*.age

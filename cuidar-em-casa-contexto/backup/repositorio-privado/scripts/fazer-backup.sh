@@ -30,17 +30,31 @@ if [[ "$usuario" == "postgres" || "$superusuario" == "t" ]] && [[ "${PERMITIR_US
 fi
 echo "    usuario: $usuario | PostgreSQL do servidor: $versao"
 
+contar() {
+  psql "$DB_URL" -X -At -v ON_ERROR_STOP=1 <<'SQL'
+select format('select %L, count(*) from public.%I', tablename, tablename) from pg_tables where schemaname = 'public' order by tablename
+\gexec
+SQL
+}
+
 echo "2/6 Copiando o schema public (estrutura e dados)..."
-pg_dump "$DB_URL" --schema=public --no-owner --no-privileges --format=custom --file="$TMP/public.dump"
+# As contagens servem para conferir a restauracao. Se alguem gravar durante a copia, contagem e dump divergem; por isso a copia
+# so vale se as contagens de ANTES e de DEPOIS forem iguais (senao repete, ate 3 vezes).
+for tentativa in 1 2 3; do
+  contar > "$TMP/contagens.txt"
+  pg_dump "$DB_URL" --schema=public --no-owner --no-privileges --format=custom --file="$TMP/public.dump"
+  contar > "$TMP/contagens-depois.txt"
+  cmp -s "$TMP/contagens.txt" "$TMP/contagens-depois.txt" && break
+  echo "    alguem gravou durante a copia (tentativa $tentativa de 3); repetindo em 20 s..."
+  (( tentativa < 3 )) || erro "o banco mudou durante as 3 tentativas de copia. Nada foi guardado; o proximo agendamento tenta de novo."
+  sleep 20
+done
+rm -f "$TMP/contagens-depois.txt"
 
 echo "3/6 Copiando a lista de usuarios (para recriar as contas na restauracao)..."
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -c "\\copy (select id, email, created_at, raw_user_meta_data from backup.usuarios order by created_at, id) to '$TMP/usuarios.csv' csv header"
 
-echo "4/6 Contando as linhas de cada tabela (para conferir na restauracao)..."
-psql "$DB_URL" -X -At -v ON_ERROR_STOP=1 > "$TMP/contagens.txt" <<'SQL'
-select format('select %L, count(*) from public.%I', tablename, tablename) from pg_tables where schemaname = 'public' order by tablename
-\gexec
-SQL
+echo "4/6 Contagens de cada tabela conferidas (antes e depois da copia iguais)."
 
 echo "5/6 Conferindo se a copia esta inteira (copia vazia ou truncada falha de proposito)..."
 tamanho=$(wc -c < "$TMP/public.dump")
