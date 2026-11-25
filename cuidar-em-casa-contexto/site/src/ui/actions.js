@@ -11,7 +11,7 @@ import {tipoOptions} from './bits.js';
 import {openCompany,openPatient,openVisit} from './details.js';
 import {$} from './dom.js';
 import {calClose,calOpen,calRender,calSet,maskDate,maskTime,parseTime,timeApply,timeOpen,timeSync,wheelGo,wheelIdx} from './fields.js';
-import {companyForm,linkForm,patientForm,saveCompany,saveLink,savePatient,saveTipo,saveVisit,tipoForm,visitForm} from './forms.js';
+import {companyForm,linkForm,openTipos,patientForm,saveCompany,saveLink,savePatient,saveTipo,saveVisit,tipoForm,visitForm} from './forms.js';
 import {dlRef,openReport,repInit,repRender,repSetMonth} from './report.js';
 import {clearMove,closeSheet,copyText,toast} from './sheet.js';
 import {renderAll,renderPatientList,renderTop,renderView} from './views.js';
@@ -41,7 +41,6 @@ const A={
   'fab':function(){
     if(ui.tab==='agenda') visitForm(null,{date:ui.day});
     else if(ui.tab==='pacientes') patientForm();
-    else if(ui.tab==='tipos') tipoForm();
     else companyForm();
   },
   'new-visit':function(el){visitForm(null,{date:el.dataset.date,patient:el.dataset.patient});},
@@ -90,7 +89,7 @@ const A={
     const g=el.dataset.go;
     if(g==='perfil') openProfile();
     else if(g==='config') openConfig();
-    else if(g==='atend'){closeSheet(true);st.lastFocus=null;ui.tab='tipos';renderAll();window.scrollTo(0,0);}
+    else if(g==='atend') openTipos();
     else if(g==='fatur'){repInit({by:'paciente',emp:'all',pac:'all'});openReport();}
     else openSoon(g);
   },
@@ -100,7 +99,8 @@ const A={
   'link-patients':function(el){linkForm(el.dataset.company);},
   'back-company':function(el){openCompany(el.dataset.id);},
   'open-tipo':function(el){tipoForm(el.dataset.name);},
-  'do-delete-tipo':function(el){deleteTipo(el.dataset.id);closeSheet();renderAll();toast('Tipo excluído.');},
+  'do-delete-tipo':function(el){deleteTipo(el.dataset.id);renderAll();openTipos();toast('Tipo excluído.');},
+  'tipos-voltar':function(){openTipos();},
   'tipo-add':function(el){
     const box=el.closest('.tipof'),inp=$('.tipo-new input',box),sel=$('select',box),err=$('#f-err');
     const nome=addTipo(inp.value);

@@ -152,7 +152,7 @@ with sync_playwright() as p:
     q.locator('#f-visit button[type=submit]').click(); saved(q)
     av = [r for r in rows('visits', E) if r['serie_data'] is None]
     chk('Q9 atendimento avulso repetido 4x', len(av) == 4 and all(r['hora'] == '15:30:00' and r['status'] == 'agendado' and r['manual'] is False for r in av), av)
-    open_menu_item(q, 'atend'); q.locator('#fab').click(); q.wait_for_selector('#f-tipo'); q.fill('#t-nome', 'Troca de sonda'); q.locator('#f-tipo button[type=submit]').click(); saved(q)
+    open_menu_item(q, 'atend'); q.locator('#sheet-root [data-action="new-tipo"]').click(); q.wait_for_selector('#f-tipo'); q.fill('#t-nome', 'Troca de sonda'); q.locator('#f-tipo button[type=submit]').click(); saved(q)
     st = sorted(r['nome'] for r in rows('service_types', E))
     chk('Q10 tipos de atendimento em service_types', 'Troca de sonda' in st and 'Curativo' in st and len(st) == len(set(x.lower() for x in st)), st)
     q.locator('[data-action="open-tipo"][data-name="Troca de sonda"]').click(); q.wait_for_selector('#f-tipo'); q.fill('#t-nome', 'Troca de sonda vesical'); q.locator('#f-tipo button[type=submit]').click(); saved(q)
@@ -166,7 +166,7 @@ with sync_playwright() as p:
     if amanha.weekday() == 6: q.locator('[data-action="week-next"]').click(); q.wait_for_timeout(200)
     q.locator('[data-action="pick-day"][data-day="%s"]' % amanha.isoformat()).click(); q.wait_for_timeout(200)
     chk('Q14 apos recarregar: excecao respeitada (amanha sem atendimento)', q.locator('.route [data-action="open-visit"]').count() == 0, q.locator('#view').inner_text()[:160])
-    open_menu_item(q, 'atend'); chk('Q15 apos recarregar: tipo renomeado aparece', 'Troca de sonda vesical' in q.locator('#view').inner_text())
+    open_menu_item(q, 'atend'); chk('Q15 apos recarregar: tipo renomeado aparece', 'Troca de sonda vesical' in q.locator('#sheet-root').inner_text()); q.keyboard.press('Escape'); q.wait_for_timeout(250)
     tab(q, 'pacientes'); chk('Q16 apos recarregar: paciente com empresa', 'João Souza' in q.locator('#view').inner_text() and 'Vida Plena' in q.locator('#view').inner_text())
     chk('Q17 recarregar nao regrava nada', not [x for x in mock('/__mock/log') if x[0] in ('POST', 'DELETE', 'PATCH')], [x for x in mock('/__mock/log') if x[0] in ('POST', 'DELETE')])
     tab(q, 'empresas'); q.locator('[data-action="open-company"]').first.click(); q.wait_for_selector('.sheet [data-action="ask"]'); confirm_delete(q); saved(q)

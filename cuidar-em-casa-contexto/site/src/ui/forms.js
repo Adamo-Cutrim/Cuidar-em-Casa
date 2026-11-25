@@ -1,6 +1,6 @@
 /* Formulários de cadastro e edição e a gravação de cada um. */
 import {TIPOS_EMPRESA} from '../app/catalog.js';
-import {addTipo,closeRecurrence,findCompany,findPatient,recSig,renameTipo,resolveVisit,tiposList} from '../app/model.js';
+import {addTipo,closeRecurrence,findCompany,findPatient,recSig,renameTipo,resolveVisit,tipoUso,tiposList} from '../app/model.js';
 import {commit} from '../app/persistence.js';
 import {ui} from '../app/state.js';
 import {st} from '../app/store.js';
@@ -97,11 +97,20 @@ export function visitForm(v,opts){
   openSheet(v.id?'Editar atendimento':'Novo atendimento',b);
 }
 
+/* Menu > Atendimentos: lista de tipos numa folha, como Perfil e Configurações (a tela de fundo não muda). */
+export function openTipos(){
+  const list=tiposList();
+  const b=(list.length?'<p class="hint hint-form">Estes tipos aparecem ao agendar um atendimento e no cadastro de pacientes recorrentes. Toque em um tipo para renomear ou excluir.</p><ul class="group">'+
+      list.map(t=>'<li><button type="button" class="row" data-action="open-tipo" data-name="'+esc(t)+'"><span class="row-main"><span class="row-name">'+esc(t)+'</span><span class="row-sub">'+esc(tipoUso(t))+'</span></span><span class="go">'+ic('right')+'</span></button></li>').join('')+'</ul>'
+    :'<p class="hint hint-form">Nenhum tipo cadastrado. Crie os tipos de atendimento que você realiza, como curativo ou fisioterapia.</p>')+
+    '<div class="sheet-actions"><button type="button" class="btn primary" data-action="new-tipo">'+ic('plus')+'Novo tipo</button><button type="button" class="btn ghost" data-action="open-menu">Voltar ao menu</button></div>';
+  openSheet('Atendimentos',b);
+}
 export function tipoForm(nome){
   const edit=nome!=null;
   const b='<form id="f-tipo" novalidate data-old="'+esc(nome||'')+'"><label for="t-nome">Nome do tipo</label><input id="t-nome" name="nome" maxlength="'+LIM.tipo+'" autocomplete="off" placeholder="Ex.: Troca de sonda" value="'+esc(nome||'')+'">'+
     (edit?'<p class="hint">Ao renomear, os atendimentos e cadastros que usam este tipo passam a usar o novo nome.</p>':'')+
-    '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Salvar tipo</button><button type="button" class="btn" data-action="close-sheet">Cancelar</button>'+
+    '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary">Salvar tipo</button><button type="button" class="btn" data-action="tipos-voltar">Voltar</button>'+
     (edit?askBlock('t'+tiposList().indexOf(nome),'Excluir o tipo “'+esc(nome)+'”? Atendimentos já registrados mantêm o nome.','do-delete-tipo',esc(nome)):'')+'</div></form>';
   openSheet(edit?'Editar tipo':'Novo tipo',b);
 }
@@ -136,7 +145,7 @@ export function saveTipo(f){
   if(!nome) return fail(f,'Informe o nome do tipo.','nome');
   if(tiposList().some(t=>t!==old&&norm(t)===norm(nome))) return fail(f,'Já existe um tipo com esse nome.','nome');
   if(old) renameTipo(old,nome);else addTipo(nome);
-  closeSheet(true);st.lastFocus=null;renderAll();
+  renderAll();openTipos();
   toast(old?'Tipo atualizado.':'Tipo criado.');
 }
 export function fail(f,msg,field){

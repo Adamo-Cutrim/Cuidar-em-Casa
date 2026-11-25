@@ -20,7 +20,8 @@ E = 'tipos.ana@teste.com'; PW = 'senha-segura-1'; hoje = datetime.date.today()
 def menu(pg, go): pg.locator('[data-action="open-menu"]').click(); pg.wait_for_timeout(250); pg.locator('[data-go="%s"]' % go).click(); pg.wait_for_timeout(300)
 def tipo_db(nome): return next((r for r in rows('service_types', E) if r['nome'] == nome), None)
 def novo_tipo(pg, nome):
-    menu(pg, 'atend'); pg.locator('#fab').click(); pg.wait_for_selector('#f-tipo'); pg.fill('#t-nome', nome); pg.locator('#f-tipo button[type=submit]').click(); saved(pg)
+    menu(pg, 'atend'); pg.locator('#sheet-root [data-action="new-tipo"]').click(); pg.wait_for_selector('#f-tipo'); pg.fill('#t-nome', nome); pg.locator('#f-tipo button[type=submit]').click(); saved(pg)
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(250)   # Menu > Atendimentos e uma folha: salvar volta para a lista
 def abrir_tipo(pg, nome):
     menu(pg, 'atend'); pg.locator('[data-action="open-tipo"][data-name="%s"]' % nome).click(); pg.wait_for_selector('#f-tipo')
 def agendar(pg, pac_id, hora, tipo=None, tipo_novo=None):
@@ -73,7 +74,7 @@ with sync_playwright() as p:
     pg.reload(); pg.wait_for_selector('#gate', state='hidden', timeout=8000); pg.wait_for_timeout(400)
     pg.locator('[data-action="tab"][data-tab="agenda"]').click(); pg.wait_for_timeout(250)
     chk('depois de recarregar, a agenda mostra o nome novo', 'Troca de sonda vesical' in pg.locator('#view').inner_text(), pg.locator('#view').inner_text()[:140].replace('\n', ' | '))
-    menu(pg, 'atend'); lt = pg.locator('#view').inner_text()
+    menu(pg, 'atend'); lt = pg.locator('#sheet-root').inner_text(); pg.keyboard.press('Escape'); pg.wait_for_timeout(250)
     chk('lista de tipos mostra o nome novo e quantos usam', 'Troca de sonda vesical' in lt and '1 atendimento' in lt, lt.replace('\n', ' | ')[:200])
 
     print('F) excluir um tipo em uso: o atendimento guarda o nome, a ligacao e solta')
