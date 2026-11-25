@@ -1,5 +1,6 @@
 /* Telas principais: cabeçalho, abas, agenda, pacientes, empresas, tipos. */
 import {findCompany,findPatient,hasExamples,tipoUso,tiposList,visitsBetween} from '../app/model.js';
+import {copiaDe} from '../app/aparelho.js';
 import {statusText} from '../app/persistence.js';
 import {auth,ui} from '../app/state.js';
 import {st} from '../app/store.js';
@@ -19,7 +20,8 @@ export function renderTop(){
   else if(t==='pacientes') sub=st.S.patients.length+(st.S.patients.length===1?' paciente cadastrado':' pacientes cadastrados');
   else if(t==='tipos'){const n=tiposList().length;sub=n+(n===1?' tipo de atendimento':' tipos de atendimento');}
   else sub=st.S.companies.length+(st.S.companies.length===1?' empresa cadastrada':' empresas cadastradas');
-  $('#top').innerHTML='<div class="top-row"><div class="top-text"><h1>'+titles[t]+'</h1><p class="sub">'+esc(sub)+'</p></div></div>';
+  const off=st.offline?'<div class="notice" role="status"><p><strong>Sem internet:</strong> só consulta. '+esc(copiaDe())+'</p><button type="button" class="btn small" data-action="auth-retry">Tentar com internet</button></div>':'';
+  $('#top').innerHTML=off+'<div class="top-row"><div class="top-text"><h1>'+titles[t]+'</h1><p class="sub">'+esc(sub)+'</p></div></div>';
 }
 /* Barra de baixo: Agenda, Pacientes, [+], Empresas, Menu. O botão do meio cria o item da tela aberta. */
 const ADD={agenda:['Agendar','Novo atendimento'],pacientes:['Paciente','Novo paciente'],empresas:['Empresa','Nova empresa'],tipos:['Tipo','Novo tipo']};

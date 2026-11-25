@@ -42,3 +42,5 @@ insert into public.recurrences (patient_id, user_id, ativo, dias, hora, tipo, in
 insert into public.recurrence_exceptions (patient_id, data, user_id) values
   ('dddddddd-0000-4000-8000-000000000001', '2026-11-11', 'aaaaaaaa-0000-4000-8000-00000000000a'),
   ('dddddddd-0000-4000-8000-000000000001', '2026-11-18', 'aaaaaaaa-0000-4000-8000-00000000000a');
+-- v20b: segredo do aparelho de uma das contas (tem de voltar igual na restauracao)
+insert into public.segredos_aparelho (user_id, segredo) values ('aaaaaaaa-0000-4000-8000-00000000000a', repeat('a1', 32));
