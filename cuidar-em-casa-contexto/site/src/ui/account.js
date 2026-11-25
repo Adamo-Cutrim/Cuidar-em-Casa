@@ -3,7 +3,7 @@ import {makeDemo} from '../app/catalog.js';
 import {hasExamples,tiposList} from '../app/model.js';
 import {bumpIdle,commit,esperaGravar,idleT,initState,loadAll} from '../app/persistence.js';
 import {SB,api,clearSes,readSes,sbSignIn,sbSignUp,storeSes} from '../app/session.js';
-import {auth,ui} from '../app/state.js';
+import {auth,ui,wipeAppStorage} from '../app/state.js';
 import {st} from '../app/store.js';
 import {LIM} from '../core/limits.js';
 import {cleanName,esc,initials} from '../core/text.js';
@@ -222,8 +222,43 @@ export function openConfig(){
     '<div class="sec"><h3>Dados de exemplo</h3>'+
     (ex?'<p class="hint">São os pacientes, empresas e atendimentos que vêm prontos para você conhecer o app. Eles nunca são salvos na sua conta.</p><div class="sheet-actions">'+askBlock('demo','Apagar todos os dados de exemplo? Os seus próprios cadastros não mudam.','clear-demo-config','','Apagar dados de exemplo')+'</div>'
       :'<p class="hint">Não há dados de exemplo nesta conta.</p>')+'</div>'+
+    '<div class="sec"><h3>Conta</h3><p class="hint">Apaga a sua conta e todos os seus dados, para sempre.</p><div class="sheet-actions"><button type="button" class="btn danger" data-action="open-excluir">Excluir minha conta</button></div></div>'+
     '<div class="sheet-actions"><button type="button" class="btn ghost" data-action="open-menu">Voltar ao menu</button></div>';
   openSheet('Configurações',b);
+}
+/* Excluir minha conta (LGPD). O banco só aceita com login com senha recente (backend/sql/2026-11-25_excluir_minha_conta.sql);
+   por isso o app confirma a senha aqui, pega uma sessão nova e só então chama a função. */
+const plural=(n,um,varios)=>n+' '+(n===1?um:varios);
+export function openExcluir(){
+  const S=st.S,real=x=>!x.ex;
+  const np=S.patients.filter(real).length,nc=S.companies.filter(real).length,nv=S.visits.filter(real).length;
+  const b='<div class="alert"><strong>Não dá para desfazer.</strong> A conta '+esc(auth.conta?auth.conta.email:'')+' e tudo o que está nela são apagados do servidor: '+
+    plural(np,'paciente','pacientes')+', '+plural(nc,'empresa','empresas')+', '+plural(nv,'atendimento','atendimentos')+', o seu perfil e os seus tipos de atendimento.</div>'+
+    '<p class="hint">As cópias de segurança automáticas que ainda tiverem os seus dados são apagadas sozinhas em até 30 dias.</p>'+
+    '<form id="f-excluir" novalidate>'+pwField('ex-senha','senha','Sua senha','current-password')+
+    '<label for="ex-conf">Para confirmar, digite EXCLUIR</label><input id="ex-conf" name="conf" autocomplete="off" autocapitalize="characters" spellcheck="false">'+
+    '<p class="err" id="f-err" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn danger">Excluir minha conta para sempre</button>'+
+    '<button type="button" class="btn" data-action="menu-go" data-go="config">Voltar às configurações</button></div></form>';
+  openSheet('Excluir conta',b);
+}
+export async function doExcluir(f){
+  const pw=fv(f,'senha');
+  if(!pw) return fail(f,'Informe a sua senha.','senha');
+  if(fv(f,'conf').trim().toUpperCase()!=='EXCLUIR') return fail(f,'Digite EXCLUIR no campo de confirmação.','conf');
+  setBusy(f,true);
+  try{
+    const d=await api('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email:SB.ses.user.email,password:pw}});
+    storeSes(d,SB.ses.persist);
+  }catch(e){
+    setBusy(f,false);
+    return fail(f,(e&&e.code==='http'&&e.status===400)?'A senha está incorreta.':errMsg(e,'Não foi possível confirmar a senha. Nada foi apagado.'),'senha');
+  }
+  try{await esperaGravar();}catch(e){}   /* grava o que estiver pendente: se a exclusão falhar, nada se perde */
+  try{await api('/rest/v1/rpc/excluir_minha_conta',{method:'POST',body:{}});}
+  catch(e){setBusy(f,false);return fail(f,'Não foi possível excluir a conta agora. Nada foi apagado. Tente de novo.','senha');}
+  clearTimeout(st.saveTimer);st.saveTimer=null;clearSes();wipeAppStorage();
+  await sair('Sua conta e todos os seus dados foram excluídos.',true);
+  wipeAppStorage();
 }
 export function openSoon(kind){
   const t=kind==='notif'?{h:'Notificações',s:'Aqui ficarão os avisos e lembretes dos seus atendimentos.'}:{h:'Configurações',s:'Aqui ficarão as preferências do app.'};

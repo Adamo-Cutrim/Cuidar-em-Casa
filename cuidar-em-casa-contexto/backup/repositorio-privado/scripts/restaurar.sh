@@ -66,6 +66,13 @@ begin
     execute format('revoke all on function %s from public, anon, authenticated', f::regprocedure);
   end loop;
 end $$;
+-- Funcoes que o APP chama: execucao volta so para o usuario logado. Funcao nova chamada pelo app? Acrescente aqui.
+do $$
+begin
+  if to_regprocedure('public.excluir_minha_conta()') is not null then   -- Configuracoes > Excluir minha conta (2026-11-25)
+    grant execute on function public.excluir_minha_conta() to authenticated;
+  end if;
+end $$;
 alter default privileges for role postgres in schema public revoke all on tables from anon, authenticated, service_role;
 alter default privileges for role postgres in schema public revoke all on functions from anon, authenticated, service_role;
 alter default privileges for role postgres in schema public revoke all on sequences from anon, authenticated, service_role;
@@ -74,6 +81,8 @@ SQL
 # Por oid (nao por nome): o Postgres pode avaliar has_table_privilege antes do filtro de schema, e um nome de tabela do sistema nao resolve.
 erradas=$(psql "$DESTINO" -X -At -v ON_ERROR_STOP=1 -c "select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p') and (has_table_privilege('anon', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'truncate') or not has_table_privilege('authenticated', c.oid, 'update'))")
 [[ "$erradas" == "0" ]] || erro "$erradas tabela(s) com permissao errada depois de reaplicar. Confira antes de usar o app."
+funcoes=$(psql "$DESTINO" -X -At -v ON_ERROR_STOP=1 -c "select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f' and (has_function_privilege('anon', p.oid, 'execute') or (p.oid = to_regprocedure('public.excluir_minha_conta()') and not has_function_privilege('authenticated', p.oid, 'execute')))")
+[[ "$funcoes" == "0" ]] || erro "$funcoes funcao(oes) com permissao errada depois de reaplicar (anon executando, ou o app sem poder excluir a conta)."
 echo "    permissoes conferidas: anon sem acesso, usuario logado so com select/insert/update/delete."
 
 echo "7/7 Pronto."

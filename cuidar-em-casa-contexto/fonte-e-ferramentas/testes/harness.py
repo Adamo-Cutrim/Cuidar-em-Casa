@@ -210,7 +210,7 @@ def out_row(r, sel):
     return o
 
 class Mock(BaseHTTPRequestHandler):
-    users = {}; byid = {}; access = {}; refresh = {}
+    users = {}; byid = {}; access = {}; refresh = {}; amr = {}   # amr: token -> metodos de login com horario (como o JWT do Supabase)
     db = Db(); log = []; fail_n = 0; reject_n = 0
     def log_message(self, *a): pass
     def cors(self):
@@ -221,9 +221,10 @@ class Mock(BaseHTTPRequestHandler):
         b = b'' if obj is None else json.dumps(obj).encode()
         self.send_response(code); self.cors(); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(b))); self.end_headers(); self.wfile.write(b)
     def err(self, code, ec, msg): self.out(code, {'code': code, 'error_code': ec, 'msg': msg})
-    def session(self, u):
+    def session(self, u, amr=None):
         at = 'at-' + secrets.token_hex(8); rt = 'rt-' + secrets.token_hex(8)
         Mock.access[at] = u['id']; Mock.refresh[rt] = u['id']
+        Mock.amr[at] = Mock.amr[rt] = amr if amr is not None else [{'method': 'password', 'timestamp': int(time.time())}]
         return {'access_token': at, 'refresh_token': rt, 'expires_in': 3600, 'expires_at': int(time.time()) + 3600, 'token_type': 'bearer', 'user': self.user(u)}
     def user(self, u): return {'id': u['id'], 'email': u['email'], 'user_metadata': {'nome': u['nome']}}
     def body(self):
@@ -259,13 +260,28 @@ class Mock(BaseHTTPRequestHandler):
                 return self.out(200, self.session(us))
             if gt == 'refresh_token':
                 uid = Mock.refresh.pop(b['refresh_token'], None)
-                if not uid: return self.err(400, 'refresh_token_not_found', 'Invalid Refresh Token')
-                return self.out(200, self.session(Mock.byid[uid]))
+                if not uid or uid not in Mock.byid: return self.err(400, 'refresh_token_not_found', 'Invalid Refresh Token')
+                return self.out(200, self.session(Mock.byid[uid], Mock.amr.get(b['refresh_token'])))   # renovar mantem o horario do login
         if p == '/auth/v1/recover' and m == 'POST': return self.out(200, {})
         if p == '/auth/v1/logout' and m == 'POST':
             self.send_response(204); self.cors(); self.end_headers(); return
         uid = self.uid()
-        if not uid: return self.err(401, 'bad_jwt', 'invalid JWT')
+        if not uid or uid not in Mock.byid: return self.err(401, 'bad_jwt', 'invalid JWT')
+        if p == '/rest/v1/rpc/excluir_minha_conta' and m == 'POST':   # backend/sql/2026-11-25_excluir_minha_conta.sql
+            if Mock.fail_n > 0: Mock.fail_n -= 1; return self.err(503, 'unexpected_failure', 'down')
+            tok = self.headers.get('Authorization', '').replace('Bearer ', '')
+            ts = [a['timestamp'] for a in Mock.amr.get(tok, []) if a['method'] == 'password']
+            if not ts or max(ts) < time.time() - 600:
+                Mock.log.append(('RECUSA', p, 'reautenticacao'))
+                return self.out(403, {'code': '42501', 'message': 'excluir_minha_conta: confirme a senha de novo', 'details': None, 'hint': 'reautenticacao'})
+            us = Mock.byid.pop(uid); del Mock.users[us['email']]
+            for t in Mock.db.rows:
+                for k, r in list(Mock.db.rows[t].items()):
+                    if r['user_id'] == uid: del Mock.db.rows[t][k]
+            for d in (Mock.access, Mock.refresh):
+                for k, v in list(d.items()):
+                    if v == uid: del d[k]
+            self.send_response(204); self.cors(); self.end_headers(); return
         if p == '/auth/v1/user':
             us = Mock.byid[uid]
             if m == 'PUT':
@@ -317,13 +333,19 @@ class Mock(BaseHTTPRequestHandler):
         if p == '/__mock/confirm': Mock.users[q['email'][0]]['confirmed'] = True; return self.out(200, {})
         if p == '/__mock/expire': Mock.access.clear(); return self.out(200, {})
         if p == '/__mock/link':
-            us = Mock.users[q['email'][0]]; s = self.session(us)
+            us = Mock.users[q['email'][0]]; s = self.session(us, [{'method': q['type'][0], 'timestamp': int(time.time())}])
             return self.out(200, {'hash': '#access_token=%s&refresh_token=%s&expires_in=3600&expires_at=%d&token_type=bearer&type=%s' % (s['access_token'], s['refresh_token'], s['expires_at'], q['type'][0])})
         if p == '/__mock/rows':
             t = q['t'][0]; e = q.get('email', [None])[0]
             rows = Mock.db.rows[t].values()
             if e: rows = [r for r in rows if r['user_id'] == Mock.users[e]['id']]
             return self.out(200, [out_row(r, ['*']) for r in rows])
+        if p == '/__mock/age_auth':   # envelhece o login com senha de todos os tokens da conta (simula sessao antiga)
+            uid = Mock.users[q['email'][0]]['id']; s = int(q['s'][0])
+            for d in (Mock.access, Mock.refresh):
+                for k, v in d.items():
+                    if v == uid: Mock.amr[k] = [dict(a, timestamp=a['timestamp'] - s) for a in Mock.amr.get(k, [])]
+            return self.out(200, {})
         if p == '/__mock/users': return self.out(200, {e: {'pw': u['pw'], 'id': u['id']} for e, u in Mock.users.items()})
         self.err(404, 'nf', p)
 

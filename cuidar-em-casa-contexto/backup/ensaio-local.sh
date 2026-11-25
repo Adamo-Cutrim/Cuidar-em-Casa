@@ -43,7 +43,7 @@ for c in "$ORIGEM" "$DESTINO"; do for _ in $(seq 1 30); do psql_em "$c" -c "sele
 echo "== 2. Montando o banco de ORIGEM: esqueleto do Supabase + as migracoes reais do projeto + dados ficticios"
 psql_em "$ORIGEM" -q < "$AQUI/ensaio/esqueleto-supabase.sql"
 psql_em "$DESTINO" -q < "$AQUI/ensaio/esqueleto-supabase.sql"
-for f in "$SQL"/2026-11-17/2026*.sql "$SQL/2026-11-18_migracoes_aplicadas.sql" "$SQL/2026-11-18_remove_site_stage.sql" "$SQL/2026-11-24_valor_snapshot.sql" "$SQL/2026-11-24_tipo_ligado.sql"; do
+for f in "$SQL"/2026-11-17/2026*.sql "$SQL/2026-11-18_migracoes_aplicadas.sql" "$SQL/2026-11-18_remove_site_stage.sql" "$SQL/2026-11-24_valor_snapshot.sql" "$SQL/2026-11-24_tipo_ligado.sql" "$SQL/2026-11-25_excluir_minha_conta.sql"; do
   psql_em "$ORIGEM" -q < "$f" >/dev/null || { echo "ERRO ao aplicar $f"; exit 1; }
 done
 psql_em "$ORIGEM" -q < "$AQUI/ensaio/dados-de-exemplo.sql" >/dev/null
@@ -94,6 +94,7 @@ done
 estrutura="select (select count(*) from pg_policies where schemaname='public')||'/'||(select count(*) from pg_indexes where schemaname='public')||'/'||(select count(*) from pg_constraint c join pg_namespace n on n.oid=c.connamespace where n.nspname='public')||'/'||(select count(*) from pg_trigger t join pg_class k on k.oid=t.tgrelid join pg_namespace n on n.oid=k.relnamespace where n.nspname='public' and not t.tgisinternal)"
 verifica "estrutura igual (politicas RLS / indices / restricoes / gatilhos)" test "$(psql_em "$ORIGEM" -c "$estrutura")" = "$(psql_em "$DESTINO" -c "$estrutura")"
 verifica "permissoes reaplicadas no destino (anon sem acesso; usuario logado sem TRUNCATE e com UPDATE)" test "$(psql_em "$DESTINO" -c "select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and (has_table_privilege('anon', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'truncate') or not has_table_privilege('authenticated', c.oid, 'update'))")" = "0"
+verifica "a funcao do app excluir_minha_conta continua executavel so pelo usuario logado" test "$(psql_em "$DESTINO" -c "select has_function_privilege('anon', 'public.excluir_minha_conta()'::regprocedure, 'execute')::text || has_function_privilege('authenticated', 'public.excluir_minha_conta()'::regprocedure, 'execute')::text")" = "falsetrue"
 verifica "RLS continua ligada em todas as tabelas do destino" test "$(psql_em "$DESTINO" -c "select count(*) from pg_tables where schemaname='public' and not rowsecurity")" = "0"
 verifica "contas recriadas com os mesmos ids e e-mails" test "$(psql_em "$ORIGEM" -c "select string_agg(id||email, ',' order by id) from auth.users")" = "$(psql_em "$DESTINO" -c "select string_agg(id||email, ',' order by id) from auth.users")"
 verifica "cada conta tem identidade de e-mail (para o 'Esqueci a senha')" test "$(psql_em "$DESTINO" -c "select count(*) from auth.users u where not exists (select 1 from auth.identities i where i.user_id=u.id and i.provider='email')")" = "0"
