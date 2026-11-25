@@ -1,0 +1,12 @@
+# Nunca versionar: segredos, chaves e qualquer saida do backup.
+.env
+*.env
+chave*
+*.key
+*chave-privada*
+AGE-SECRET-KEY*
+saida/
+tmp/
+*.age
+*.dump
+*.csv

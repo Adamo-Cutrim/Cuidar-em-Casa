@@ -48,7 +48,8 @@ with sync_playwright() as p:
     txt = pg.locator('#sheet-root').inner_text()
     chk('diz que nao da para desfazer', 'não dá para desfazer' in txt.lower(), txt[:80])
     chk('mostra quantos pacientes serao apagados', '1 paciente' in txt)
-    chk('oferece baixar o backup antes', pg.locator('#sheet-root [data-action="backup"]').count() == 1)
+    chk('nao oferece baixar backup (o app so tem o backup automatico)', pg.locator('#sheet-root [data-action="backup"]').count() == 0)
+    chk('avisa que as copias automaticas expiram em ate 30 dias', 'em até 30 dias' in txt)
 
     print('B) Recusas: nada e apagado')
     mock('/__mock/clearlog'); enviar(pg, '', 'EXCLUIR'); chk('sem senha: pede a senha', 'senha' in erro(pg).lower(), erro(pg))

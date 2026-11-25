@@ -7,10 +7,9 @@ import {addDays,brToIso,fromIso,iso,startOfWeek} from '../core/dates.js';
 import {norm} from '../core/text.js';
 import {setStatus} from '../domain/visit.js';
 import {boot,doCriar,doEntrar,doNova,doReset,doSenha,doExcluir,openConfig,openExcluir,openMenu,openPassword,openProfile,openSoon,sair,saveProfile,showGate} from './account.js';
-import {applyImport,backupObject,readBackupFile} from './backup.js';
 import {tipoOptions} from './bits.js';
 import {openCompany,openPatient,openVisit} from './details.js';
-import {$,dlFile} from './dom.js';
+import {$} from './dom.js';
 import {calClose,calOpen,calRender,calSet,maskDate,maskTime,parseTime,timeApply,timeOpen,timeSync,wheelGo,wheelIdx} from './fields.js';
 import {companyForm,linkForm,patientForm,saveCompany,saveLink,savePatient,saveTipo,saveVisit,tipoForm,visitForm} from './forms.js';
 import {dlRef,openReport,repInit,repRender,repSetMonth} from './report.js';
@@ -96,14 +95,6 @@ const A={
     else openSoon(g);
   },
   'logout':function(){sair();},
-  'import-pick':function(){const i=$('#imp-file');if(i) i.click();},
-  'import-confirm':function(){applyImport();},
-  'backup':function(){
-    const o=backupObject();
-    if(!o.empresas.length&&!o.pacientes.length&&!o.atendimentos.length){toast('Ainda não há dados seus para guardar.');return;}
-    dlFile('cuidar-em-casa_backup_'+iso(new Date())+'.json',JSON.stringify(o,null,2),'application/json');
-    toast('Backup baixado.');
-  },
   'confirm-move':function(el){const f=el.closest('form');if(!f) return;f.dataset.moveOk='1';if(f.id==='f-patient') savePatient(f);else if(f.id==='f-link') saveLink(f);},
   'cancel-move':function(el){const f=el.closest('form');if(f) clearMove(f);},
   'link-patients':function(el){linkForm(el.dataset.company);},
@@ -226,7 +217,6 @@ document.addEventListener('input',function(e){
 document.addEventListener('change',function(e){
   const t=e.target;
   if(t&&t.dataset&&t.dataset.role==='cfg-saude'){st.hideHealth=t.checked;writeLocal(HEALTH_KEY,t.checked?'1':'0');return;}
-  if(t&&t.dataset&&t.dataset.role==='import-file'){const f=t.files&&t.files[0];t.value='';readBackupFile(f);return;}
   if(t&&t.dataset&&t.dataset.role==='rep-emp'){
     ui.rep.emp=t.value;
     const p=findPatient(ui.rep.pac);
