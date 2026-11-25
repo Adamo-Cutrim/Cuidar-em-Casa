@@ -1,5 +1,5 @@
 /* Telas principais: cabeçalho, abas, agenda, pacientes, empresas, tipos. */
-import {findCompany,findPatient,hasExamples,tipoUso,tiposList,visitsBetween} from '../app/model.js';
+import {findCompany,findPatient,hasExamples,visitsBetween} from '../app/model.js';
 import {statusText} from '../app/persistence.js';
 import {auth,ui} from '../app/state.js';
 import {st} from '../app/store.js';
@@ -13,16 +13,15 @@ export function renderAll(){if(!auth.logged) return;renderTop();renderView();ren
 
 export function renderTop(){
   const t=ui.tab;
-  const titles={agenda:'Agenda da semana',pacientes:'Pacientes',empresas:'Empresas',tipos:'Atendimentos'};
+  const titles={agenda:'Agenda da semana',pacientes:'Pacientes',empresas:'Empresas'};
   let sub='';
   if(t==='agenda') sub=weekLabel();
   else if(t==='pacientes') sub=st.S.patients.length+(st.S.patients.length===1?' paciente cadastrado':' pacientes cadastrados');
-  else if(t==='tipos'){const n=tiposList().length;sub=n+(n===1?' tipo de atendimento':' tipos de atendimento');}
   else sub=st.S.companies.length+(st.S.companies.length===1?' empresa cadastrada':' empresas cadastradas');
   $('#top').innerHTML='<div class="top-row"><div class="top-text"><h1>'+titles[t]+'</h1><p class="sub">'+esc(sub)+'</p></div></div>';
 }
 /* Barra de baixo: Agenda, Pacientes, [+], Empresas, Menu. O botão do meio cria o item da tela aberta. */
-const ADD={agenda:['Agendar','Novo atendimento'],pacientes:['Paciente','Novo paciente'],empresas:['Empresa','Nova empresa'],tipos:['Tipo','Novo tipo']};
+const ADD={agenda:['Agendar','Novo atendimento'],pacientes:['Paciente','Novo paciente'],empresas:['Empresa','Nova empresa']};
 function tabBtn(t){
   return '<button type="button" class="tab" data-action="tab" data-tab="'+t[0]+'"'+(ui.tab===t[0]?' aria-current="page"':'')+'><span class="pill">'+ic(t[2])+'</span>'+t[1]+'</button>';
 }
@@ -31,14 +30,13 @@ function renderTabs(){
   $('#tabs').innerHTML=tabBtn(['agenda','Agenda','calendar'])+tabBtn(['pacientes','Pacientes','users'])+
     '<button type="button" class="tabadd" id="fab" data-action="fab" aria-label="'+a[1]+'"><span class="circ">'+ic('plus')+'</span><span class="lbl">'+a[0]+'</span></button>'+
     tabBtn(['empresas','Empresas','building'])+
-    '<button type="button" class="tab" data-action="open-menu" aria-haspopup="dialog"'+(ui.tab==='tipos'?' aria-current="page"':'')+'><span class="pill">'+ic('menu')+'</span>Menu</button>';
+    '<button type="button" class="tab" data-action="open-menu" aria-haspopup="dialog"><span class="pill">'+ic('menu')+'</span>Menu</button>';
 }
 export function renderView(){
   let h='';
   if(hasExamples()) h+='<div class="notice"><p>Estes são dados de exemplo para você ver o app em uso.</p><button type="button" class="btn small" data-action="clear-demo">Apagar exemplos</button></div>';
   if(ui.tab==='agenda') h+=viewAgenda();
   else if(ui.tab==='pacientes') h+=viewPacientes();
-  else if(ui.tab==='tipos') h+=viewTipos();
   else h+=viewEmpresas();
   h+='<p class="foot" id="foot">'+esc(statusText())+'</p>';
   $('#view').innerHTML=h;
@@ -119,12 +117,6 @@ export function renderPatientList(){
   }).join('')+'</ul>';
 }
 
-function viewTipos(){
-  const list=tiposList();
-  if(!list.length) return '<div class="empty"><p>Nenhum tipo cadastrado. Crie os tipos de atendimento que você realiza, como curativo ou fisioterapia.</p><button type="button" class="btn small primary" data-action="new-tipo">Criar tipo</button></div>';
-  return '<p class="hint hint-list">Estes tipos aparecem ao agendar um atendimento e no cadastro de pacientes recorrentes. Toque em um tipo para renomear ou excluir.</p><ul class="group">'+
-    list.map(t=>'<li><button type="button" class="row" data-action="open-tipo" data-name="'+esc(t)+'"><span class="row-main"><span class="row-name">'+esc(t)+'</span><span class="row-sub">'+esc(tipoUso(t))+'</span></span></button></li>').join('')+'</ul>';
-}
 function viewEmpresas(){
   if(!st.S.companies.length) return '<div class="empty"><p>Nenhuma empresa cadastrada. Cadastre as empresas para as quais você presta serviço e vincule seus pacientes a elas.</p><button type="button" class="btn small primary" data-action="new-company">Cadastrar empresa</button></div>';
   const list=st.S.companies.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
