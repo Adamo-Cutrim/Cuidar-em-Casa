@@ -51,7 +51,7 @@ Gerado em 18/11/2026. Esta pasta reúne tudo o que existe do projeto "APP para H
 Passos que estavam pendentes (todos feitos):
 1. Publicar `site/` na Vercel (conta pessoal, team `team_5JcllrpkR3M3EK72I0E7TOLf`). O ambiente do Claude.ai não alcança vercel.com nem GitHub. **Caminho mais simples no Claude Code:** na pasta `site/`, rodar `vercel --prod` (ou ligar um repositório GitHub). Projeto sem framework, sem build, pasta de saída = a própria pasta.
 2. Garantir que a URL de produção seja pública (desligar Vercel Authentication/SSO protection do projeto, se estiver ligada).
-3. No painel do Supabase (Authentication, URL Configuration): colocar a URL da Vercel em **Site URL** e em **Redirect URLs**; decidir sobre "Confirm email"; ligar proteção contra senhas vazadas. O SMTP embutido só envia para e-mails de membros da organização.
+3. No painel do Supabase (Authentication, URL Configuration): colocar a URL da Vercel em **Site URL** e em **Redirect URLs**; decidir sobre "Confirm email"; ligar proteção contra senhas vazadas. O SMTP embutido tem teto de 2 e-mails por hora (a restrição a membros da organização não se confirmou em 25/11/2026).
 4. Testar no celular: criar conta, cadastrar paciente, agendar, recarregar, sair e entrar.
 5. Rodar de novo `fonte-e-ferramentas/testes/rodar_testes.sh` contra a versão final de `site/` (sobe o mock e troca o `SB_URL` sozinho).
 6. Apagar `site_stage`; salvar `versoes/v15_...` e atualizar `INDICE.md` e o histórico de `ESTRUTURA_BASE.md`.
@@ -62,13 +62,14 @@ Passos que estavam pendentes (todos feitos):
 - ~~**E7**~~ **corrigido em 24/11/2026**: backup adulterado (ex.: `serieData` `2026-02-30`, `ex: "sim"`) não trava mais a gravação; o valor inválido é descartado na validação.
 - ~~**E6**~~ **corrigido em 24/11/2026**: `1.234` vale mil duzentos e trinta e quatro; valor negativo pede correção.
 - **Troca de deploy:** por alguns segundos, durante a troca, a CDN pode servir o `app.js` novo com um módulo antigo ou ainda ausente (visto em 24/11: `supabase.js` deu 404 logo após o deploy, depois 200). Melhoria possível: versionar os caminhos dos módulos.
-- **v18 feita (24/11/2026)** (`versoes/v18_2026-11-24_1909_site/`): **v18a** o valor do atendimento é guardado ao marcar como feito (`visits.valor_snapshot`); **v18b** atendimento e recorrência ligados ao tipo da lista (`service_type_id`). Migrações aplicadas. Próximas: v19 (backup automático, aguarda decisões do usuário) e v20 (offline).
+- **v18 feita (24/11/2026)** (`versoes/v18_2026-11-24_1909_site/`): **v18a** o valor do atendimento é guardado ao marcar como feito (`visits.valor_snapshot`); **v18b** atendimento e recorrência ligados ao tipo da lista (`service_type_id`). Migrações aplicadas. **v19 (código pronto, 24/11/2026):** backup automático em `backup/` (leia `backup/README.md`); o usuário precisa rodar `bash cuidar-em-casa-contexto/backup/assistente-backup.sh` e fazer o ensaio de restauração. Próxima: v20 (offline).
 - **Configurações, parte 1 (25/11/2026):** Menu > Configurações tem "Esconder dados de saúde" (só neste aparelho; o aviso de alergia continua) e "Apagar dados de exemplo". Teste `t6.py`. A parte 2 (excluir a conta) vem em PR próprio, com migração.
 - **Decisões de 24/11/2026** (BACKEND §11): valor do atendimento guardado ao marcar como feito; tipo de atendimento ligado à lista de tipos; **uso offline é necessário**; backup automático sem plano pago. Roteiro na ESTRUTURA_BASE seção 5b. **Atenção:** o repositório do projeto é **público**; nunca guardar backup, chave ou dado de paciente nele. Levantamento do backup: `backend/BACKUP_SEM_PLANO_PAGO.md`.
 - Testes: `fonte-e-ferramentas/testes/rodar_testes.sh` roda 172 testes unitários (Node, `testes/unit`) e 142 de navegador (`t2` a `t5`); roda também no Windows (Git Bash + Python 3 + Playwright). `testes/lint.sh` procura nomes sem import (ESLint `no-undef`). Eles **não detectam** violações de CSP; para isso há a opção `CSP_ESTRITA=1` (só aplica o cabeçalho, a conferência é por console/estilo calculado).
+- **Antes de abrir o app a outras pessoas:** configurar SMTP próprio no Supabase Auth (hoje o envio embutido permite só 2 e-mails por hora para o projeto todo; entregou para um e-mail de fora da organização no teste de 25/11/2026, mas é serviço de teste). Adiado em 25/11/2026 por falta de domínio e poucos usuários de teste. Plano e comparação Brevo × Resend: `BACKEND.md` seção 11, item 18. Também pendentes para o lançamento: CAPTCHA no cadastro (`BACKEND.md` 11), backup criptografado e senhas vazadas (exige plano Pro).
 - Decisões em aberto: `BACKEND.md` seção 11.
 - LGPD: dados de saúde são sensíveis; validar com profissional de proteção de dados antes de usar dados reais.
 
 ## Integridade
-`site/app.js` sha256 `b95e213268680bd92681f20d3e3d5df8c57494e805cc50f6b91da25b99f58abd` (v18, só a entrada; os módulos estão em `versoes/v18_2026-11-24_1909_site/src/`)
-`site/styles.css` sha256 `38799ba7bd4d33cc516669dabd41fbff3331412adeb9631b02e61afd53ae9cf5`
+`site/app.js` sha256 `a061989814d6d77af1100aa42f14435b88cdd882fdcf8ff0a35cd648b0f7350e` (v19, só a entrada; os módulos estão em `versoes/v19_2026-11-25_1900_site/src/`)
+`site/styles.css` sha256 `357215275ac657665fdec71c9fcc8a5de9e2fb7b31167336bda34c60502bc7ba`

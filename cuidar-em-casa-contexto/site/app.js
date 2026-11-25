@@ -5,7 +5,6 @@ import './src/ui/fields.js';
 import './src/app/state.js';
 import './src/app/persistence.js';
 import './src/app/session.js';
-import './src/ui/backup.js';
 import './src/ui/report.js';
 import './src/ui/account.js';
 import './src/app/model.js';
