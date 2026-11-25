@@ -290,6 +290,11 @@ Ordem sugerida: v15 (backup + fontes locais) → organizar em arquivos + reposit
 | 20261118172825 | `esquema_normalizado` | Esquema normalizado desta seção (com trava que aborta se as tabelas antigas tivessem dados) |
 | 20261118172908 | `indice_recurrences_user_patient` | Índice apontado pelo advisor de performance |
 | 20261118195029 | `remove_site_stage` | Apagou a tabela `site_stage` depois do deploy na Vercel (decisão do usuário). SQL em `backend/sql/2026-11-18_remove_site_stage.sql`. |
+| 20261124154036 | `valor_snapshot_em_visits` | Coluna `visits.valor_snapshot` (valor guardado ao marcar como feito). Aplicada por outra sessão; SQL não está em `backend/sql/`. |
+| 20261124220855 | `tipo_ligado_a_lista` | `service_type_id` em `visits` e `recurrences`, com FK composta para `service_types`. Aplicada por outra sessão; SQL não está em `backend/sql/`. |
+| (sem versão) | `permissoes_minimas_e_datas_protegidas` | Rodada pelo usuário no SQL Editor em 24/11, por isso fora do histórico do Supabase. Ver seção 9.3. SQL em `backend/sql/2026-11-24_permissoes_minimas_e_datas_protegidas.sql`. |
+| (registrada em 24/11) | `funcoes_novas_sem_execute_publico` | Complemento da anterior: função nova não nasce executável por `anon`/`authenticated`. Mesmo arquivo SQL, parte 5. |
+| (registrada em 25/11) | `limite_de_registros_por_conta` | Gatilhos `*_limit` (antes de insert) limitam linhas por conta: empresas 500, pacientes 3.000, recorrências 3.000, atendimentos 60.000, exceções 20.000, tipos 200. Só conta linha nova (upsert de linha existente passa). Erro `23514` `limite_de_registros:<tabela>`. SQL em `backend/sql/2026-11-25_limite_de_registros_por_conta.sql`. |
 
 O SQL das migrações de 18/11 está guardado em `backend/sql/2026-11-18_migracoes_aplicadas.sql` (registro; não rodar de novo no mesmo banco).
 
@@ -315,8 +320,10 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 - **Excluir empresa**: `patients.company_id` vira `null` (paciente particular), o paciente fica. **Excluir paciente**: apaga `visits`, `recurrences` e `recurrence_exceptions` dele. **Excluir usuário**: apaga tudo dele (declarado nas FKs; não testado).
 - **Série**: índice único parcial `visits (user_id, patient_id, serie_data) where serie_data is not null`: a mesma ocorrência de uma recorrência não materializa duas vezes.
 - **Índices:** `patients (user_id, company_id)`, `patients (user_id, nome)`, `visits (user_id, data)` (consulta por mês), `visits (user_id, patient_id, data)`, `recurrences (user_id, patient_id)`, `recurrence_exceptions (user_id, patient_id)`, `service_types (user_id, lower(btrim(nome)))` único.
-- **`updated_at` automático** (gatilho antes de update) em `companies`, `patients`, `visits`, `recurrences` e `profiles`, usando `set_updated_at()` (`search_path` vazio, sem `security definer`). Serve para resolver conflito entre aparelhos; **o app ainda não usa**.
-- **RLS ligada em todas as tabelas**; para cada tabela de dados, 4 políticas (select, insert, update, delete) `TO authenticated` com `(select auth.uid()) = user_id`, e update com `using` e `with check`. `anon` sem nenhuma permissão nelas. `authenticated` com select/insert/update/delete.
+- **`updated_at` automático** (gatilho antes de insert e de update, desde 24/11/2026) em `companies`, `patients`, `visits`, `recurrences` e `profiles`, usando `set_updated_at()` (`search_path` vazio, sem `security definer`). Serve para resolver conflito entre aparelhos; **o app ainda não usa**.
+- **`created_at` definido pelo banco** (desde 24/11/2026): gatilho `*_lock_created_at` com `lock_created_at()` nas 6 tabelas que têm a coluna. No insert vale `now()`; no update fica o valor antigo. O cliente não consegue alterar.
+- **RLS ligada em todas as tabelas**; para cada tabela de dados, 4 políticas (select, insert, update, delete) `TO authenticated` com `(select auth.uid()) = user_id`, e update com `using` e `with check`. `anon` sem nenhuma permissão nelas. `authenticated` **só** com select/insert/update/delete (desde 24/11/2026 sem `TRUNCATE`, `TRIGGER`, `REFERENCES` e `MAINTAIN`, que vinham das regras padrão).
+- **Regras padrão do schema `public` (desde 24/11/2026):** tabela, função ou sequência nova **não nasce acessível** por `anon`, `authenticated` nem `service_role`, e função nova não nasce executável por `PUBLIC`. **Toda migração que criar tabela ou função usada pelo app precisa de `GRANT` explícito**, junto da RLS; sem isso a API responde `42501 permission denied`.
 
 ### 9.4 Testes executados em 18/11/2026 (transação desfeita; conferido depois: 0 linhas e 0 usuários de teste)
 
@@ -423,6 +430,8 @@ Todas as tabelas de dados têm `user_id uuid not null default auth.uid()` com FK
 | 18/11/2026 16:51 | (Claude Code) Site publicado na Vercel (projeto `cuidar-em-casa`, ligado ao GitHub, deploy automático da `main`). Usuário configurou as URLs do Auth e testou no celular sem erros. Tabela `site_stage` apagada (migração `remove_site_stage`). Pontos 7 e 11 resolvidos. |
 | 18/11/2026 16:13 | (Claude Code) v15: camada de dados do site adaptada ao esquema normalizado (seção 9.7). Mock e testes reescritos para o esquema real. SQL das migrações de 17/11 exportado para `backend/sql/2026-11-17/`. Ponto 15 esclarecido; pontos 16 e 17 novos. |
 | 23/11/2026 | (Claude Code) v16: restaurar backup JSON implementado (seção 10). Descoberto que a PK é global (`id`), o que exige remapear ids ao importar de outra conta. |
+| 24/11/2026 | (Claude Code) Verificação de segurança em 20 pontos (tabela e pendências no relatório da sessão). Item 5 corrigido: permissões mínimas para `authenticated`, nenhuma para `anon`, regras padrão do `public` fechadas, `created_at` e `updated_at` definidos pelo banco (seções 9.1 e 9.3). Verificado: isolamento entre usuários (intruso vê 0 de 3 pacientes), API sem login responde 42501, advisor de segurança só com o aviso de senhas vazadas. |
+| 25/11/2026 | (Claude Code) Item 2 da verificação de segurança: limite de registros por conta no banco (gatilhos `*_limit`, ver 9.1). Testado: no limite, linha nova é recusada e reenvio de linha existente passa. |
 | 18/11/2026 | Por decisão do usuário: (1) leitura pública de `site_stage` fechada; (2) migração para o **esquema normalizado** (companies, patients, visits, recurrences, recurrence_exceptions, service_types; FKs compostas com `user_id`, cascatas, constraints, índices, RLS), com trava contra perda de dados. Testes de isolamento, FKs, cascatas e constraints passaram (desfeitos). Índice adicional em `recurrences` após advisor. SQL salvo em `backend/sql/2026-11-18_migracoes_aplicadas.sql`. Seção 9 reescrita; seção 10 atualizada; pontos em aberto 10 a 15. |
 
 ---
