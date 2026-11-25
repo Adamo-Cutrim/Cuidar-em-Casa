@@ -7,7 +7,6 @@ import {addDays,brToIso,fromIso,iso,startOfWeek} from '../core/dates.js';
 import {norm} from '../core/text.js';
 import {setStatus} from '../domain/visit.js';
 import {boot,doCriar,doEntrar,doNova,doReset,doSenha,openMenu,openPassword,openProfile,openSoon,sair,saveProfile,showGate} from './account.js';
-import {applyImport,readBackupFile} from './backup.js';
 import {tipoOptions} from './bits.js';
 import {openCompany,openPatient,openVisit} from './details.js';
 import {$} from './dom.js';
@@ -89,8 +88,6 @@ const A={
     else openSoon(g);
   },
   'logout':function(){sair();},
-  'import-pick':function(){const i=$('#imp-file');if(i) i.click();},
-  'import-confirm':function(){applyImport();},
   'confirm-move':function(el){const f=el.closest('form');if(!f) return;f.dataset.moveOk='1';if(f.id==='f-patient') savePatient(f);else if(f.id==='f-link') saveLink(f);},
   'cancel-move':function(el){const f=el.closest('form');if(f) clearMove(f);},
   'link-patients':function(el){linkForm(el.dataset.company);},
@@ -207,7 +204,6 @@ document.addEventListener('input',function(e){
 });
 document.addEventListener('change',function(e){
   const t=e.target;
-  if(t&&t.dataset&&t.dataset.role==='import-file'){const f=t.files&&t.files[0];t.value='';readBackupFile(f);return;}
   if(t&&t.dataset&&t.dataset.role==='rep-emp'){
     ui.rep.emp=t.value;
     const p=findPatient(ui.rep.pac);

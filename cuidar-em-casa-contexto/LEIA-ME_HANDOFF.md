@@ -70,5 +70,5 @@ Passos que estavam pendentes (todos feitos):
 - LGPD: dados de saúde são sensíveis; validar com profissional de proteção de dados antes de usar dados reais.
 
 ## Integridade
-`site/app.js` sha256 `b95e213268680bd92681f20d3e3d5df8c57494e805cc50f6b91da25b99f58abd` (v18, só a entrada; os módulos estão em `versoes/v18_2026-11-24_1909_site/src/`)
-`site/styles.css` sha256 `38799ba7bd4d33cc516669dabd41fbff3331412adeb9631b02e61afd53ae9cf5`
+`site/app.js` sha256 `a061989814d6d77af1100aa42f14435b88cdd882fdcf8ff0a35cd648b0f7350e` (v19, só a entrada; os módulos estão em `versoes/v19_2026-11-25_1900_site/src/`)
+`site/styles.css` sha256 `357215275ac657665fdec71c9fcc8a5de9e2fb7b31167336bda34c60502bc7ba`
